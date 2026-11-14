@@ -274,6 +274,33 @@ do {
         drawFlippedText(sub, in: CGRect(x: card.minX, y: card.maxY - 56, width: card.width, height: 42), fontName: "PingFangSC-Semibold", size: 28, color: .white, align: .center, bold: true)
     }
 
+    // Tile E3: Red Book Plaque "C 教学楼" (u: 0.6875..0.8086, v: 0.5293..0.6680 -> x:704..828, y:542..684)
+    do {
+        let cRect = CGRect(x: 704, y: 542, width: 124, height: 142)
+        ctx.setFillColor(rgb(0.94, 0.93, 0.90))
+        ctx.fill(cRect)
+        let card = cRect.insetBy(dx: 8, dy: 10)
+        ctx.setFillColor(rgb(0.66, 0.21, 0.19))
+        ctx.fill(card)
+        ctx.setStrokeColor(rgb(0.96, 0.95, 0.92))
+        ctx.setLineWidth(3.5)
+        ctx.stroke(card.insetBy(dx: 6, dy: 6))
+        drawFlippedText("C", in: CGRect(x: card.minX, y: card.minY + 6, width: card.width, height: 74), fontName: "TimesNewRomanPS-BoldMT", size: 64, color: .white, align: .center, bold: true)
+        drawFlippedText("教学楼", in: CGRect(x: card.minX, y: card.maxY - 40, width: card.width, height: 32), fontName: "PingFangSC-Semibold", size: 22, color: .white, align: .center, bold: true)
+    }
+
+    // Tile H: Cafeteria Signboard "学生食堂" (u: 0.8223..0.9922, v: 0.5430..0.6543 -> x:842..1016, y:556..670)
+    do {
+        let sRect = CGRect(x: 842, y: 556, width: 174, height: 114)
+        ctx.setFillColor(rgb(0.10, 0.28, 0.46))
+        ctx.fill(sRect)
+        ctx.setStrokeColor(rgb(0.84, 0.72, 0.44))
+        ctx.setLineWidth(4)
+        ctx.stroke(sRect.insetBy(dx: 6, dy: 6))
+        drawFlippedText("学生食堂", in: CGRect(x: sRect.minX + 8, y: sRect.minY + 20, width: sRect.width - 16, height: 48), fontName: "PingFangSC-Semibold", size: 32, color: .white, align: .center, bold: true)
+        drawFlippedText("DINING HALL", in: CGRect(x: sRect.minX + 8, y: sRect.minY + 72, width: sRect.width - 16, height: 26), fontName: "HelveticaNeue-Bold", size: 14, color: NSColor(red: 0.96, green: 0.86, blue: 0.58, alpha: 1.0), align: .center, bold: true)
+    }
+
     // Tile F: Music Corridor Header Sign (u: 0.36..1.0, v: 0.68..0.84 -> x:368..1024, y:696..860)
     let mcRect = CGRect(x: 368, y: 696, width: 656, height: 164)
     ctx.setFillColor(rgb(0.14, 0.16, 0.18))
@@ -298,7 +325,7 @@ do {
         ctx.addCurve(to: CGPoint(x: wx + 48, y: 950), control1: CGPoint(x: wx + 16, y: 900), control2: CGPoint(x: wx + 32, y: 1000))
         ctx.strokePath()
     }
-    drawFlippedText("美  育  浮  雕", in: CGRect(x: 420, y: 924, width: 552, height: 56), fontName: "STKaiti", size: 38, color: NSColor(red: 0.84, green: 0.68, blue: 0.44, alpha: 0.9), align: .center, bold: true)
+    drawFlippedText("尚 美 · 美 育 浮 雕", in: CGRect(x: 420, y: 924, width: 552, height: 56), fontName: "STKaiti", size: 38, color: NSColor(red: 0.84, green: 0.68, blue: 0.44, alpha: 0.9), align: .center, bold: true)
 
     try savePNG(rep, to: "\(outDir)/tex_plaques_stage.png")
 }

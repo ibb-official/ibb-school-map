@@ -105,7 +105,7 @@ export default function AboutPage() {
               双校区同城尺度与三维建模精度
             </h3>
             <p style={{ margin: "0 0 10px", fontSize: "13.5px", lineHeight: 1.7, color: "#334155" }}>
-              两校区直线相距约 <strong>{DUAL_CAMPUS_LINK.straightLineKm} 公里</strong>（东偏 {DUAL_CAMPUS_LINK.deltaEastMeters} 米，北偏 {DUAL_CAMPUS_LINK.deltaNorthMeters} 米）。三维场景采用 <strong>1:1 真实米制 ENU 工程坐标</strong>（`1 Three.js 单位 = 1.0 米`），依据 OpenStreetMap 实测多边形底座起模，并对照多角度实景照片独立建模建筑层间饰带、-0.20m 深凹铝框窗格、3×5 锥顶玻璃天窗、三次贝塞尔弧形大坡道与双侧张拉膜主席台，最终烘焙导出轻量级 `.glb`（Binary glTF 2.0）嵌入门牌招牌与材质图集，首屏即可在主流桌面与移动端浏览器中流畅旋转与漫游。
+              两校区直线相距约 <strong>{DUAL_CAMPUS_LINK.straightLineKm} 公里</strong>（东偏 {DUAL_CAMPUS_LINK.deltaEastMeters} 米，北偏 {DUAL_CAMPUS_LINK.deltaNorthMeters} 米）。三维场景采用 <strong>1:1 真实米制 ENU 工程坐标</strong>（`1 Three.js 单位 = 1.0 米`），依据 OpenStreetMap 与手绘/正射复核多边形底座起模，并对照多角度实景照片独立建模建筑层间饰带、-0.20m 深凹铝框窗格、C 座屋顶开敞矩形梁格构架、三次贝塞尔弧形大坡道与坐北朝南张拉膜主席台，最终烘焙导出轻量级 `.glb`（Binary glTF 2.0）嵌入门牌招牌与材质图集，首屏即可在主流桌面与移动端浏览器中流畅旋转与漫游。
             </p>
             <p style={{ margin: 0, fontSize: "13px", color: "#516175" }}>
               协作者亦可在仓库 `blender/` 目录下运行 `build_in_blender.py`（Blender 4.x `bpy` 脚本）或 `generate_campus_glb.py` 对单个建筑对象继续精修并同步更新 `src/data/places.ts`。

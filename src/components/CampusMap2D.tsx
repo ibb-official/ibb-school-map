@@ -32,6 +32,7 @@ const POLY_FILL: Record<Map2DPolygon["kind"], string> = {
   "sports-court": "#a7f3d0",
   gate: "#fecaca",
   corridor: "#ccfbf1",
+  plaza: "#f1f5f9",
 };
 
 const POLY_STROKE: Record<Map2DPolygon["kind"], string> = {
@@ -45,6 +46,7 @@ const POLY_STROKE: Record<Map2DPolygon["kind"], string> = {
   "sports-court": "#0f766e",
   gate: "#b91c1c",
   corridor: "#0f766e",
+  plaza: "#cbd5e1",
 };
 
 function pointsToSvg(pts: EnuPoint[]): string {
@@ -234,7 +236,7 @@ export function CampusMap2D({
                   西校区 · 校本部
                 </text>
                 <text x="0" y="144" textAnchor="middle" fill="#cbd5e1" fontSize="17">
-                  同福夹道3号（15个建模节点）
+                  同福夹道3号（16个建模节点）
                 </text>
               </g>
 
@@ -320,7 +322,7 @@ export function CampusMap2D({
   const polys = campusId === "west" ? WEST_2D_POLYGONS : EAST_2D_POLYGONS;
   const viewBox =
     campusId === "west"
-      ? "-180 -158 215 190"
+      ? "-178 -154 202 192"
       : "-55 -105 130 165";
 
   return (
@@ -458,6 +460,65 @@ export function CampusMap2D({
           );
         })}
 
+        {/* West Campus Oval Track Lanes & 3 Basketball Courts Markings */}
+        {campusId === "west" && (
+          <g pointerEvents="none" fill="none" stroke="rgba(255,255,255,0.88)">
+            {[15.35, 16.4, 17.45].map((r) => {
+              const inset = 18.5 - r;
+              const x = -89.5 + inset;
+              const y = -(124.5 - inset);
+              const w = -8.0 - inset - (-89.5 + inset);
+              const h = 37.0 - 2 * inset;
+              return (
+                <rect
+                  key={`lane-${r}`}
+                  x={x}
+                  y={y}
+                  width={w}
+                  height={h}
+                  rx={r}
+                  ry={r}
+                  strokeWidth="0.32"
+                />
+              );
+            })}
+            {[
+              [-69.5, -56.3],
+              [-54.7, -41.5],
+              [-39.9, -26.7],
+            ].map(([cx0, cx1]) => (
+              <g key={`court-${cx0}`} strokeWidth="0.35">
+                <rect x={cx0} y={-118.2} width={cx1 - cx0} height={24.4} />
+                <line x1={cx0} y1={-106.0} x2={cx1} y2={-106.0} />
+                <circle cx={(cx0 + cx1) * 0.5} cy={-106.0} r={1.8} />
+              </g>
+            ))}
+          </g>
+        )}
+
+        {/* Sub-zone & Neighbor Captions */}
+        <g pointerEvents="none">
+          {polys
+            .filter((poly) => poly.subLabel && poly.labelEnu)
+            .map((poly) => (
+              <text
+                key={`sublabel-${poly.id}`}
+                x={poly.labelEnu![0]}
+                y={-poly.labelEnu![1]}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={poly.kind === "context" ? 5.2 : 3.4}
+                fontWeight={poly.kind === "context" ? "700" : "600"}
+                fill={poly.kind === "context" ? "#475569" : "#334155"}
+                stroke="#ffffff"
+                strokeWidth="0.7"
+                paintOrder="stroke"
+              >
+                {poly.subLabel}
+              </text>
+            ))}
+        </g>
+
         {/* Clickable Point Markers + Codes */}
         {places.map((p) => {
           const sx = p.enu[0];
@@ -497,7 +558,7 @@ export function CampusMap2D({
         <g
           transform={
             campusId === "west"
-              ? "translate(18, -142)"
+              ? "translate(14, -142)"
               : "translate(61, -92)"
           }
         >
