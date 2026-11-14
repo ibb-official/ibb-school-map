@@ -36,3 +36,10 @@ next-env.d.ts
 # 本地抓取与临时素材（勿入库）
 /_tmpimg/
 /*.html
+
+# Blender 工作副本与 Python 字节码（体积较大，只提交 scripts 与导出后的 .glb）
+*.blend
+*.blend1
+*.blend2
+__pycache__/
+*.py[cod]

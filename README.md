@@ -1,75 +1,71 @@
-# 北京市第一六六中学（非官方校园地图）
+# 北京市第一六六中学三维校园外围地图（非官方 · `map.bj166zx.cn`）
 
-基于 **Next.js (App Router) + TypeScript** 规划构建的北京市第一六六中学非官方校园地图与空间导览整理项目。
+基于 **Next.js 15 (App Router) + TypeScript + Three.js + glTF 2.0 (`.glb`) / Blender** 构建的北京市第一六六中学（非官方）双校区校园外围三维导览地图项目，涵盖**西校区（同福夹道3号校本部）** 与 **东校区（东四六条甲44号毕业年级部）**，现阶段聚焦校园外部建筑体量、校门牌匾与户外广场，不涉及室内结构。
 
-生产环境沿用 `bj166-school-site` 的单主机架构，规划运行在公网 VPS `sofia-vps`（hostname `r-server89187-mls`，IP `108.165.233.143`），由同机的 `edge-caddy` 承担反向代理与 TLS 终结，配合 Cloudflare DNS 与 GitHub Actions 全自动 CI/CD 发布（镜像独立托管于 GHCR，容器端口与网络与 `bj166-web` 完全隔离）。
+生产环境沿用 `bj166-school-site` 的单主机架构，部署于公网 VPS `sofia-vps`（hostname `r-server89187-mls`，IP `108.165.233.143`），由 `edge-caddy` 负责反向代理与 TLS 终结，与 `bj166-web` 端口及容器网络完全隔离。
 
-> **免责声明**：本站为学生协作维护的非官方项目，不代表北京市第一六六中学或任何教育行政部门。地图与建筑信息仅整理自公开资料，不得将本站当作校方正式导览、通知或安防管理依据。
+> **免责声明**：本站为学生/校友开源技术协作维护的非官方项目，不代表北京市第一六六中学或任何教育行政部门发布。地图几何与建筑信息仅整理自 OpenStreetMap 公开矢量、公开实景照片与新闻文献，不得作为正式入校或安防管理依据。
 
 ---
 
-## 架构与基础设施拓扑（规划）
+## 核心特性
 
-```
-       [ 公网访客浏览器 ]
-               │
-               ▼ (HTTPS 443 / 校园地图域名，待分配)
-     [ Cloudflare DNS ] (灰云 DNS-Only，指向 sofia-vps: 108.165.233.143)
-               │
-               ▼
-  [ 核心服务节点: sofia-vps ] ─── 网站运行主机 + 流量入口 (hostname r-server89187-mls)
-               │ 运行: Docker edge-caddy (监听 80/443，管理证书，reverse_proxy 127.0.0.1:<MAP_PORT>)
-               │ 运行: Next.js Standalone 生产容器 ibb-school-map-web (127.0.0.1:<MAP_PORT>)
-               │ 目录: /opt/ibb-school-map/ (docker-compose.yml 托管，与 /opt/bj166-site/ 隔离)
-```
+1. **双校区独立精细 3D 校园模型（`public/models/*.glb`）**：
+   - **西校区（15 个可交互点位）**：同福夹道3号古铜悬挑门额与 LED 校名牌匾、“慎独”巨石与校友雕塑庭院、南院弧面教学综合楼、5 层 B 座斜翼与“B 教学楼”红书标识、C 座 3×5 金字塔玻璃天窗矩阵、白色弧形无障碍大坡道与雪松、东北外挂折返钢构楼梯塔、百草园方亭、北区塑胶操场与三跨白色张拉膜主席台、青砖灰瓦二层挑廊 D 座等。
+   - **东校区（10 个可交互点位）**：东四六条甲44号朱红筒瓦门楼与青砖门房、“5”字限速地面标线、55 米红砖林荫甬道、北院东西两侧传统四合院灰瓦厢房肌理、南院双联标准篮球场与 4 座绿/灰屋顶教学建筑群。
+2. **数据与三维场景解耦**：所有空间坐标、建筑描述、相机机位、精选巡航路径与图源声明均独立维护于 `src/data/`，`.glb` 模型节点通过精准名称（`W-*` / `E-*`）与数据绑定。
+3. **晨光 / 正午 / 夕照三时段实时光照 + 交互式 2D 矢量平面降级 + 1.24 km 双校同城空间总览**。
+4. **公开摄影实拍对比抽屉**：每个重点点位在侧边栏联动显示年份实拍照片与明确版权出处。
 
 ---
 
 ## 仓库结构
 
-当前仓库已完成协作配置与规范骨架，应用代码将通过后续 PR 逐步初始化：
-
 ```
 ├── .github/
-│   ├── CODEOWNERS              PR 自动请求全体协作者评审
+│   ├── CODEOWNERS                    PR 自动请求全体协作者评审
 │   └── workflows/
-│       ├── ci.yml              GitHub Actions PR 校验（ESLint + Next.js Build）
-│       └── deploy.yml          GitHub Actions 构建镜像、推送 GHCR 与远程部署流水线
-├── .dockerignore               Docker 构建排除规则
-├── .gitignore                  Git 忽略规则（Node/Next.js/环境变量/临时文件）
-├── AGENTS.md                   服务器职责边界、安全红线与团队协作规范（AI/协作者必读）
-├── CLAUDE.md                   项目交接说明与当前状态唯一入口
-└── README.md                   项目说明与本地开发指引
+│       ├── ci.yml                    PR 校验（Node 20: npm ci / lint / build）
+│       └── deploy.yml                main 分支构建 GHCR 镜像并部署 sofia-vps
+├── blender/
+│   ├── README.md                     Blender / glTF 建模坐标系与规范
+│   ├── data/                         东西校区 ENU 米制 OSM 真源坐标 JSON
+│   └── scripts/
+│       ├── render_textures.swift     (macOS) 招牌、砖瓦、跑道图集渲染脚本
+│       ├── generate_campus_glb.py    无须 Blender 的高精度 glTF 2.0 (.glb) 生成器
+│       └── build_in_blender.py       Blender 4.x (`bpy`) 装配及 glTF 导出脚本
+├── public/
+│   ├── images/ref/                   经合规排查并转换后的轻量化 WebP 校园照片
+│   ├── maps/map-mark.svg             站点图标
+│   └── models/                       west-campus.glb / east-campus.glb
+├── src/
+│   ├── app/                          首页地图工作台 (/)、项目与图源说明 (/about)、404
+│   ├── components/                   CampusScene3D、CampusMap2D、PlaceDetailDrawer 等
+│   └── data/                         campuses.ts / places.ts / tours.ts / sources.ts / map2dGeometry.ts
+├── Dockerfile                        Node 20 Alpine 多阶段最小化生产镜像
+├── docker-compose.yml                sofia-vps 隔离容器编排 (127.0.0.1:3010 -> 3000)
+├── next.config.mjs                   Next.js Standalone + `.glb` MIME 响应头
+├── AGENTS.md                         服务器职责边界与内容安全红线
+└── CLAUDE.md                         协作者交接说明入口
 ```
 
 ---
 
-## 本地开发（遵循 worktree 协作纪律）
+## 本地开发（遵循 worktree 与本机构建区规范）
 
-请勿在仓库主目录（`_anchor` 空树分支）直接开发，所有修改均通过独立 worktree 与 Pull Request 完成：
+主目录（`_anchor` 空树分支）不直接修改或安装依赖；所有开发通过独立 `wt` 工作区与本机构建区执行：
 
 ```bash
-# 1. 创建任务工作区
+# 1. 创建独立开发 worktree
 wt new 校园地图 <任务slug>
 cd ~/dev/.wt/校园地图/<任务slug>
 
-# 2. 安装依赖与本地开发（应用脚手架初始化后）
-npm ci
-npm run dev
+# 2. 若需重建 3D .glb 模型（支持纯 Python 或 Blender 4.x）
+python3 blender/scripts/generate_campus_glb.py
 
-# 3. 提交前校验
-npm run lint && npm run build
+# 3. 同步至本机高速盘构建区执行安装、校验与测试（避免在项目卷写入 node_modules/.next）
+mkdir -p "$HOME/.build/校园地图/<任务slug>"
+rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='.next' ./ "$HOME/.build/校园地图/<任务slug>/"
+cd "$HOME/.build/校园地图/<任务slug>"
+npm ci && npm run lint && npm run build
 ```
-
----
-
-## 团队自动化部署与协作（CI/CD）
-
-本项目配置了完整的 GitHub Actions 流水线与评审机制：
-
-- **PR 评审机制（CODEOWNERS）**：任何 PR 创建后会自动向 `@huihiya`、`@guaiqi1964-dev`、`@IGNGserver`、`@hxsx1016`、`@ljy111222` 发送评审请求，需经过校验与评审后合入 `main`。
-- **PR 阶段（`.github/workflows/ci.yml`）**：当应用或配置代码变更时，自动运行 `npm ci`、`npm run lint` 与 `npm run build`。
-- **main 分支（`.github/workflows/deploy.yml`）**：应用代码合入 `main` 后，自动执行：
-  1. 通过 Docker Buildx 进行多阶段构建；
-  2. 推送容器镜像到 GitHub Packages：`ghcr.io/ibb-official/ibb-school-map:latest`；
-  3. 通过受控 SSH Secret 直连部署目标 `sofia-vps`，触发受控部署与健康检查确认上线。
