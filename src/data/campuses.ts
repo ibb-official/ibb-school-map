@@ -9,9 +9,9 @@ export const CAMPUSES: Record<CampusId, CampusMeta> = {
     address: "北京市东城区同福夹道3号",
     district: "东城区 · 灯市口—东四南片区",
     modelUrl: "/models/west-campus.glb",
-    approxAreaSqm: "约 11,400 m²（南北纵深约 135 m × 东西宽约 96 m）",
-    defaultCameraPos: [54, 68, 48],
-    defaultCameraTarget: [-36, 5, -68],
+    approxAreaSqm: "约 13,500 m²（南北纵深约 137 m × 东西宽约 101 m）",
+    defaultCameraPos: [48, 70, 44],
+    defaultCameraTarget: [-38, 6, -74],
     panBounds: {
       minX: -145,
       maxX: 60,
@@ -29,7 +29,7 @@ export const CAMPUSES: Record<CampusId, CampusMeta> = {
       "灯市口小学周边街区（西邻）",
     ],
     summary:
-      "西校区保留了老北京胡同文脉与现代校园立体连廊空间格局：南门以仿古铜门额与“慎独”巨石迎客，中轴线布置红褐砖面、浅米肌理教学综合楼与空中钢架斜廊、弧形无障碍大坡道、百草园方亭，北部展开环形塑胶操场、弧顶张拉膜主席台与两层青砖灰瓦 D 座建筑。",
+      "西校区保留了老北京胡同文脉与立体教学连廊空间格局：南正门直通东侧主通道与 A 座弧角综合楼，中部为 C 座、楼梯间、B 座（保留约 26° 东北折角）连体 6 层核心教学楼群；B 座南侧绿地布置冰心像、慎独石与自二层引出的弧形大坡道及老雪松，西合百草园与音乐长廊，北部展开 200 m 环形塑胶操场（含南侧石砖地与无车棚自行车停放区）、坐北朝南张拉膜主席台、单层高二平房区、西北角二层青砖校史馆（D 座）及操场东侧单层圆拱顶学生食堂。",
   },
   east: {
     id: "east",

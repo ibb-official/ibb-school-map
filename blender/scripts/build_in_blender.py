@@ -220,28 +220,29 @@ def build_west_scene(west_json: dict, mats: Dict[str, bpy.types.Material], root_
     ways = {str(w["id"]): w for w in west_json["ways"]}
 
     add_extruded_polygon("Campus_Ground_West", ways["352521262"]["pts"], -0.18, 0.18, mats["ground"], root_col)
-    add_box("W-G1", -0.6, 5.2, 0.0, 12.8, 4.6, 5.6, mats["brick_red"], root_col, bevel_width=0.04)
-    add_box("W-L1", -6.4, 17.5, 0.0, 2.6, 1.8, 3.6, mats["qingzhuan"], root_col, bevel_width=0.05)
-    add_box("W-L3", -11.2, 21.2, 0.0, 1.3, 1.3, 2.4, mats["bronze"], root_col, bevel_width=0.04)
+    add_box("W-G1", -1.2, 7.6, 0.0, 14.0, 4.6, 5.4, mats["brick_red"], root_col, bevel_width=0.04)
+    add_box("W-L1", -6.8, 55.2, 0.0, 3.0, 1.4, 3.3, mats["qingzhuan"], root_col, bevel_width=0.05)
+    add_box("W-L3", -16.5, 52.0, 0.0, 1.3, 1.3, 2.55, mats["bronze"], root_col, bevel_width=0.04)
 
-    # Central teaching complex B1 (C座西翼) + B2 (西北连廊) + B3 (B座东北斜翼)
-    wb3_pts = [(-47.0, 77.2), (-37.5, 68.4), (-8.4, 87.4), (-2.0, 75.7), (-36.3, 57.4), (-47.0, 57.6)]
-    wb1_pts = [(-90.0, 76.1), (-69.8, 77.3), (-68.2, 34.3), (-79.9, 34.0), (-81.0, 49.8), (-87.7, 53.5)]
-    wb2_pts = [(-69.8, 77.2), (-54.9, 77.1), (-55.8, 61.9), (-69.3, 61.7)]
-    add_extruded_polygon("W-B3", wb3_pts, 0.0, 19.2, mats["stucco"], root_col, 0.04)
-    add_extruded_polygon("W-B1", wb1_pts, 0.0, 15.6, mats["stucco"], root_col, 0.04)
-    add_extruded_polygon("W-B2", wb2_pts, 0.0, 15.6, mats["stucco"], root_col, 0.04)
-    add_box("W-R1", -20.0, 56.0, 0.0, 32.0, 4.2, 4.2, mats["white_alu"], root_col, bevel_width=0.04)
+    # Central teaching complex: C座 (W-B1, 6F taller) + 楼梯间 (W-B2, 6F) + B座 (W-B3, 6F NE inflection)
+    wb1_pts = [(-89.8, 76.2), (-55.2, 76.8), (-55.2, 58.0), (-68.2, 58.0), (-68.2, 34.2), (-79.9, 34.0), (-81.0, 49.8), (-87.8, 53.5)]
+    wb2_pts = [(-55.2, 76.8), (-41.5, 76.8), (-41.5, 57.5), (-55.2, 58.0)]
+    wb3_pts = [(-41.5, 70.0), (-11.5, 84.5), (-5.8, 72.8), (-35.5, 57.5), (-41.5, 57.5)]
+    add_extruded_polygon("W-B1", wb1_pts, 0.0, 23.65, mats["stucco"], root_col, 0.04)
+    add_extruded_polygon("W-B2", wb2_pts, 0.0, 21.50, mats["stucco"], root_col, 0.04)
+    add_extruded_polygon("W-B3", wb3_pts, 0.0, 21.50, mats["stucco"], root_col, 0.04)
+    add_box("W-R1", -32.0, 44.5, 0.0, 35.0, 4.6, 4.35, mats["white_alu"], root_col, bevel_width=0.04)
 
-    add_extruded_polygon("W-B4", ways["636389217"]["pts"], 0.0, 12.2, mats["stucco"], root_col, 0.04)
-    add_box("W-ST1", -5.5, 81.0, 0.0, 6.4, 6.2, 16.0, mats["dark_steel"], root_col, bevel_width=0.03)
-    add_box("W-MC", -92.7, 68.0, 0.0, 5.5, 20.2, 4.9, mats["skylight"], root_col, bevel_width=0.03)
-    add_box("W-L2", -45.0, 48.0, 0.0, 4.8, 4.8, 5.0, mats["crimson"], root_col, bevel_width=0.04)
-    add_box("W-P1", -50.5, 108.0, 0.0, 82.0, 42.5, 0.14, mats["track"], root_col, bevel_width=0.0)
-    add_box("W-P2", -8.0, 108.0, 0.0, 9.0, 21.0, 8.6, mats["tensile"], root_col, bevel_width=0.04)
-    add_box("W-B5", -48.0, 138.0, 0.0, 58.0, 10.2, 10.2, mats["qingzhuan"], root_col, yaw_rad=0.05, bevel_width=0.04)
-    add_box("W-B6", 8.2, 66.0, 0.0, 8.8, 58.0, 6.6, mats["roof_red"], root_col, bevel_width=0.04)
-    add_box("Context_West", 18.0, 62.0, 0.0, 12.0, 96.0, 4.2, mats["context"], root_col, bevel_width=0.0)
+    add_extruded_polygon("W-B4", ways["636389217"]["pts"], 0.0, 11.4, mats["stucco"], root_col, 0.04)
+    add_box("W-ST1", -6.8, 80.5, 0.0, 6.2, 5.8, 21.0, mats["dark_steel"], root_col, bevel_width=0.03)
+    add_box("W-MC", -91.2, 77.8, 0.0, 4.6, 22.4, 4.6, mats["skylight"], root_col, bevel_width=0.03)
+    add_box("W-L2", -56.4, 48.0, 0.0, 18.0, 12.0, 0.12, mats["ground"], root_col, bevel_width=0.02)
+    add_box("W-P1", -48.8, 106.0, 0.0, 81.5, 37.0, 0.14, mats["track"], root_col, bevel_width=0.0)
+    add_box("W-P2", -44.0, 129.0, 0.0, 22.0, 6.0, 5.1, mats["tensile"], root_col, bevel_width=0.04)
+    add_box("W-B5", -39.0, 137.8, 0.0, 52.0, 8.0, 3.8, mats["qingzhuan"], root_col, bevel_width=0.04)
+    add_box("W-H1", -81.0, 129.0, 0.0, 22.0, 8.4, 8.8, mats["qingzhuan"], root_col, bevel_width=0.04)
+    add_box("W-B6", 0.2, 112.0, 0.0, 11.6, 31.0, 6.35, mats["roof_red"], root_col, bevel_width=0.04)
+    add_box("Context_West", -130.0, 120.0, 0.0, 68.0, 34.0, 12.0, mats["context"], root_col, bevel_width=0.0)
 
 
 def build_east_scene(east_json: dict, mats: Dict[str, bpy.types.Material], root_col: bpy.types.Collection) -> None:
