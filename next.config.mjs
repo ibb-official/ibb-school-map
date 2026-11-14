@@ -13,7 +13,7 @@ const nextConfig = {
           { key: "Content-Type", value: "model/gltf-binary" },
           {
             key: "Cache-Control",
-            value: "public, max-age=86400, stale-while-revalidate=604800",
+            value: "public, max-age=0, must-revalidate",
           },
         ],
       },
