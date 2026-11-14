@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="北京市第一六六中学非官方校园地图标识">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1c6cae" />
+      <stop offset="100%" stop-color="#0b3f70" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)" stroke="#8a6d3b" stroke-width="2" />
+  <path d="M14 28 L32 14 L50 28 L46 28 L46 47 L18 47 L18 28 Z" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" />
+  <path d="M26 47 L26 35 L38 35 L38 47" fill="none" stroke="#d9ebfa" stroke-width="2" />
+  <polygon points="32,8 35,16 32,14 29,16" fill="#f3c86a" />
+  <circle cx="32" cy="25" r="3" fill="#f3c86a" />
+</svg>

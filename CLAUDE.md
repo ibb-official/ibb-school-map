@@ -7,7 +7,7 @@
 
 ## 一、这是什么
 
-北京市第一六六中学**非官方**校园地图整理项目。技术栈沿用 `bj166-school-site` 方案：Next.js (App Router) + TypeScript + Docker (Standalone) + Caddy。
+北京市第一六六中学**非官方**三维校园外围地图项目（规划域名 `https://map.bj166zx.cn`）。技术栈：Next.js 15 (`output: 'standalone'`) + React 19 + TypeScript + Three.js (`three` + `GLTFLoader` + `MapControls` + `RoomEnvironment`) + 代码化 Blender/glTF 2.0 (`.glb`) 建模流水线。
 
 | 项 | 值 |
 | --- | --- |
@@ -15,9 +15,9 @@
 | 参考项目 | https://github.com/ibb-official/bj166-school-site |
 | 本地工作区 | `~/dev/ibb/校园地图`（`_anchor` 空树主目录）；开发一律走 `wt new 校园地图 <slug>` |
 | 生产机（规划） | `sofia-vps`（108.165.233.143，hostname `r-server89187-mls`），Docker + `edge-caddy` |
-| 部署隔离边界 | 独立目录 `/opt/ibb-school-map/`、独立本机端口 `127.0.0.1:<MAP_PORT>`（禁止复用 `bj166-web` 的 `3000`） |
+| 部署隔离边界 | 独立目录 `/opt/ibb-school-map/`、独立本机回环端口 `127.0.0.1:${MAP_PORT:-3010}:3000`、独立网段 `172.20.2.0/24`（禁止复用 `bj166-web` 的 `3000` 与 `172.20.1.0/24`） |
 
-**定位红线**：本站是非官方校园资料与导览整理项目，不代表学校授权发布。页面必须保留“非正式 / 非官方”标识与免责声明。
+**定位红线**：本站是非官方校园外围空间导览与资料整理项目，不代表学校授权发布。页面顶部与底部常驻“非官方项目”免责声明。
 
 ---
 
@@ -25,82 +25,55 @@
 
 | 维度 | 状态 |
 | --- | --- |
-| GitHub 仓库 | 已创建 `ibb-official/ibb-school-map`（Public） |
-| 协作者与评审 | 已配置 `.github/CODEOWNERS`（`@huihiya @guaiqi1964-dev @IGNGserver @hxsx1016 @ljy111222`） |
-| CI/CD 流水线 | 已配置 `.github/workflows/ci.yml` 与 `.github/workflows/deploy.yml`（带 `paths` 过滤，应用代码落地后自动激活） |
-| 规范文档 | 已完成 `AGENTS.md`、`CLAUDE.md`、`README.md` |
-| 应用脚手架 | **待初始化**（尚未写入 `package.json`、`src/`、`Dockerfile`、`docker-compose.yml`） |
-| 生产环境配置 | **待分配**：`<MAP_PORT>`、域名、`/opt/ibb-school-map/` 及仓库 SSH Deploy Secrets |
+| GitHub 仓库与协作者 | `ibb-official/ibb-school-map` 已配置 `.github/CODEOWNERS` 与 `ci.yml` / `deploy.yml` |
+| 3D `.glb` 模型与建模流水线 | **已完成**：`blender/` 脚本可重建 `public/models/west-campus.glb`（17 节点，约 3.2 MB）与 `east-campus.glb`（12 节点，约 2.0 MB），精细刻画门额牌匾、深凹窗格、3×5 金字塔天窗、弧形大坡道、张拉膜主席台与东四传统合院肌理 |
+| Web 应用与容器工程 | **已完成**（PR 验证中）：Next.js 15 + Three.js 实时 3D 浏览（含晨光/正午/夕照、射线拾取高亮、导览飞镜、投影点位标签）、2D 矢量 CAD 降级图、1.24 km 双校总览图、`/about` 数据来源页、`Dockerfile`（Node 20 Alpine）与 `docker-compose.yml` |
+| 生产环境接入 | **待部署配置**：`sofia-vps` `/opt/ibb-school-map/` 部署目录、`MAP_PORT`（默认 `3010`）、`edge-caddy` `map.bj166zx.cn` 站点块及仓库 Deploy Secrets |
 
 ---
 
-## 三、规划代码结构
-
-后续初始化 Next.js 应用时，参考 `bj166-school-site` 保持结构清晰：
+## 三、核心目录与节点强约定
 
 ```
-├── .github/
-│   ├── CODEOWNERS               PR 自动请求全体协作者评审
-│   └── workflows/
-│       ├── ci.yml               PR 阶段自动运行 lint 与 build
-│       └── deploy.yml           main 分支构建 GHCR 镜像并部署至 sofia-vps
+├── .github/workflows/           ci.yml (Node 20 lint+build) / deploy.yml (GHCR+SSH)
+├── blender/
+│   ├── data/                    west_metric.json & east_metric.json（ENU 米制真源）
+│   └── scripts/                 render_textures.swift / generate_campus_glb.py / build_in_blender.py
+├── public/
+│   ├── images/ref/              7 张经过安全审查与轻量化转换的校园建筑 WebP 照片
+│   ├── maps/map-mark.svg        导航徽标
+│   └── models/                  west-campus.glb & east-campus.glb（不可随手改名节点）
 ├── src/
-│   ├── app/
-│   │   ├── layout.tsx           全局布局、元数据与免责页眉/页脚
-│   │   ├── page.tsx             校园地图主视图（交互导览 / 建筑索引 / 搜索）
-│   │   ├── globals.css          全局样式（兼顾移动端触控与响应式布局）
-│   │   └── ...                  关于本站 / 来源说明 / 404 等页面
-│   ├── components/              地图画布、图层控制、点位详情抽屉、检索栏等组件
-│   └── data/                    建筑、楼层、设施、路线、来源说明等结构化数据
-├── public/                      校徽、矢量底图、建筑实拍图（轻量 WebP/SVG）
-├── Dockerfile                   Next.js Standalone 多阶段镜像构建定义
-├── docker-compose.yml           sofia-vps 生产容器编排（独立端口与网络）
-├── next.config.mjs              Next.js 运行时配置（output: 'standalone'）
-├── tsconfig.json
-└── AGENTS.md                    服务器边界与项目规范
+│   ├── data/                    types.ts / campuses.ts / places.ts / tours.ts / sources.ts / map2dGeometry.ts
+│   ├── components/              CampusScene3D.tsx / CampusMap2D.tsx / PlaceDetailDrawer.tsx / MapWorkspace.tsx 等
+│   └── app/                     page.tsx / about/page.tsx / not-found.tsx / layout.tsx / globals.css
+├── Dockerfile                   Node 20 Alpine Standalone 多阶段加固镜像
+└── docker-compose.yml           127.0.0.1:${MAP_PORT:-3010}:3000 + ibb-school-map_default (172.20.2.0/24)
 ```
 
----
-
-## 四、内容与数据规则（硬性，不可违反）
-
-1. **只写公开、可核验的校园空间事实**。不臆测未公开的建筑用途或内部布局。
-2. **不发布个人与师生隐私**：教师名录、学生姓名、个人联系方式（电话、邮箱、微信号）、班主任/办公室个人对应信息一律不收。
-3. **不标注内部安防与敏感管理设施**：监控探头位置、门禁控制、围墙薄弱点、值班室/财务等内部管理敏感细节不得绘制或标注。
-4. **含学生正面肖像且画面出现姓名的照片不用**。所有实拍图与参考资料须注明出处与许可协议。
-5. **非官方免责声明常驻**：页面顶部或底部必须明确提示“非学校官方网站 / 仅作公开资料整理导览”。
+> **模型节点绑定约定**：`src/data/places.ts` 中每条记录的 `meshNodeName`（`W-G1`..`W-B6`、`E-G1`..`E-B5`）必须与对应 `.glb` 内的对象节点名称严格一致，Three.js 会基于节点挂载独立克隆材质高亮与射线交互。
 
 ---
 
-## 五、部署与提交流程
+## 四、内容与安全规则（硬性，不可违反）
 
-1. **创建任务 worktree**：
-   ```bash
-   wt new 校园地图 <任务slug>
-   cd ~/dev/.wt/校园地图/<任务slug>
-   ```
-2. **本地校验**（应用初始化后）：
-   ```bash
-   npm run lint && npm run build
-   ```
-3. **提交与 PR**：
-   - 推送任务分支：`git push -u origin agent/<任务slug>`
-   - 创建 PR：`gh pr create`（必须写明改动范围、验证命令与真实结果）
-   - 等待 `CI (PR Validation)` 通过且经 `CODEOWNERS` 中协作者评审后合并（不直推 `main`）。
-4. **生产发布链路**：
-   - 代码合入 `main` → GitHub Actions 构建镜像推送至 `ghcr.io/ibb-official/ibb-school-map:latest` → SSH 至 `sofia-vps`（校验 hostname 为 `r-server89187-mls`）→ 更新容器并健康检查。
-   - **安全边界**：不向协作者分发服务器公钥，不开放 root，不把临时排查命令长期塞进 `deploy.yml`。
+1. **只呈现公开、可核验的校园外围建筑与户外公共场地事实**；现阶段不做室内空间细节。
+2. **零个人与师生隐私**：教师名录、现役学生姓名、个人联系方式、班级个人映射一律不收（公开历史校友如冰心、谢希德等历史脉络提及除外）。
+3. **零安防敏感细节**：监控点位、门禁/值班密码、内部限制区细节禁止建模或标注。
+4. **照片安全审查**：含学生正面肖像且画面出现姓名的照片一律不用；每张实拍图均在 `src/data/places.ts` 与 `/about` 注明拍摄年份及出处。
+5. **不直接在 `~/dev` 或 `.wt` 下保留 `node_modules` / `.next`**，所有构建安装在本机 `$HOME/.build/` 内执行。
 
 ---
 
-## 六、待办（按优先级）
+## 五、常用校验与提交流程
 
-1. **确定基础设施参数**（由 `IGNGserver` 完成）：
-   - 在 `sofia-vps` 分配未占用的本地端口 `<MAP_PORT>`（避开 `3000`）、独立 Docker 子网与 `/opt/ibb-school-map/`；
-   - 确定域名并在 Cloudflare DNS 与 `edge-caddy` 中接入；
-   - 在 GitHub 仓库配置 Deploy Secrets（`VM_SSH_HOST`、`VM_SSH_PORT`、`VM_SSH_USER`、`VM_SSH_KEY`）与 GHCR 拉取凭据。
-2. **初始化 Next.js 应用骨架**（单独走 PR）：
-   - 初始化 `package.json`、`tsconfig.json`、`eslint.config.mjs`、`next.config.mjs`、`Dockerfile`、`docker-compose.yml`；
-   - 建立基础页面、非官方免责声明与地图数据 schema。
-3. **采集与核验校园公开地理/建筑资料**：
-   - 整理公开校区分布、主要教学楼/功能区/文化地标与合规实拍图。
+```bash
+# 同步至本机高速盘构建区运行校验
+mkdir -p "$HOME/.build/校园地图/<slug>"
+rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='.next' \
+  "$HOME/dev/.wt/校园地图/<slug>/" "$HOME/.build/校园地图/<slug>/"
+cd "$HOME/.build/校园地图/<slug>"
+npm ci && npm run lint && npm run build
+```
+
+- 分支合并策略：本仓库为 `Collaboration: collaborative`，任何功能改动均走 `branch → push → PR → CI 通过 → 人工评审合并`。
