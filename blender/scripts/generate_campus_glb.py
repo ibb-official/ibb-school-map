@@ -13,9 +13,11 @@ Coordinate system:
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -1600,6 +1602,22 @@ def resolve_tex_dir(repo: Path) -> str:
     return str(tex_path)
 
 
+def sync_campuses_model_version(repo: Path, filename: str) -> str:
+    """Update `?v=<sha8>` query param on modelUrl in src/data/campuses.ts after rebuilding a GLB."""
+    sha8 = hashlib.sha256((repo / "public" / "models" / filename).read_bytes()).hexdigest()[:8]
+    campuses_ts = repo / "src" / "data" / "campuses.ts"
+    if campuses_ts.exists():
+        text = campuses_ts.read_text()
+        updated = re.sub(
+            rf"/models/{re.escape(filename)}(?:\?v=[0-9a-f]+)?",
+            f"/models/{filename}?v={sha8}",
+            text,
+        )
+        if updated != text:
+            campuses_ts.write_text(updated)
+    return sha8
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate procedural campus GLB models")
     parser.add_argument(
@@ -1618,12 +1636,14 @@ def main() -> None:
     if args.campus in ("west", "all"):
         wv, wt = build_west_campus(str(data_dir / "west_metric.json"), tex_dir, str(out_dir / "west-campus.glb"))
         ws = (out_dir / "west-campus.glb").stat().st_size
-        print(f"west-campus.glb: {wv} verts, {wt} tris, {ws:,} bytes")
+        w_ver = sync_campuses_model_version(repo, "west-campus.glb")
+        print(f"west-campus.glb (v={w_ver}): {wv} verts, {wt} tris, {ws:,} bytes")
 
     if args.campus in ("east", "all"):
         ev, et = build_east_campus(str(data_dir / "east_metric.json"), tex_dir, str(out_dir / "east-campus.glb"))
         es = (out_dir / "east-campus.glb").stat().st_size
-        print(f"east-campus.glb: {ev} verts, {et} tris, {es:,} bytes")
+        e_ver = sync_campuses_model_version(repo, "east-campus.glb")
+        print(f"east-campus.glb (v={e_ver}): {ev} verts, {et} tris, {es:,} bytes")
 
 
 if __name__ == "__main__":
