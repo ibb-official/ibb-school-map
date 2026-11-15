@@ -35,6 +35,7 @@ UVBox = Tuple[float, float, float, float]
 UV_WEST_FASCIA: UVBox = (0.01, 0.01, 0.99, 0.215)
 UV_WEST_PLAQUE: UVBox = (0.015, 0.245, 0.268, 0.755)
 UV_SHENDU_STONE: UVBox = (0.305, 0.245, 0.615, 0.755)
+UV_SHENDU_GRANITE: UVBox = (0.312, 0.248, 0.608, 0.320)
 UV_MARBLE: UVBox = (0.645, 0.245, 0.995, 0.515)
 UV_BURGUNDY: UVBox = (0.645, 0.545, 0.995, 0.755)
 UV_EAST_SIGN: UVBox = (0.015, 0.785, 0.49, 0.992)
@@ -44,6 +45,7 @@ UV_FLAG: UVBox = (0.785, 0.785, 0.995, 0.995)
 UV_STAGE_LED: UVBox = (0.005, 0.005, 0.715, 0.315)
 UV_PILLAR_LEFT: UVBox = (0.742, 0.005, 0.858, 0.515)
 UV_PILLAR_RIGHT: UVBox = (0.882, 0.005, 0.995, 0.515)
+UV_PA_SPEAKER: UVBox = (0.6855, 0.3340, 0.7344, 0.5215)
 UV_B_WALL_SIGN: UVBox = (0.005, 0.345, 0.335, 0.995)
 UV_BOOK_B: UVBox = (0.365, 0.345, 0.505, 0.655)
 UV_BOOK_D: UVBox = (0.525, 0.345, 0.665, 0.655)
@@ -943,6 +945,68 @@ def add_basketball_hoop(nb: NodeBuilder, cx: float, cy_n: float, yaw_face_rad: f
     nb.add_cylinder(mats["orange_hoop"], pt(0, 1.48, 0)[0], pt(0, 1.48, 0)[1], 3.05, 0.24, 0.24, 0.06, 12)
 
 
+def add_pa_speaker_stack(nb: NodeBuilder, sx: float, sy: float, yaw_rad: float, mats: dict) -> None:
+    """Compact weatherproof outdoor PA speaker cabinet on dual-post steel stand."""
+    cs, sn = math.cos(yaw_rad), math.sin(yaw_rad)
+
+    def rot(lx: float, ly: float) -> Vec2:
+        return (sx + lx * cs - ly * sn, sy + lx * sn + ly * cs)
+
+    # Compact stone/steel pedestal & twin support stanchions
+    nb.add_box(mats["surf"], sx, sy, 0.0, 0.74, 0.62, 0.22, yaw_rad, UV_QINGZHUAN, ao_bot=0.72, ao_top=0.90)
+    for lx in (-0.18, 0.18):
+        px, py = rot(lx, 0.0)
+        nb.add_box(mats["dark_steel"], px, py, 0.22, 0.09, 0.12, 0.80, yaw_rad, ao_bot=0.76, ao_top=0.94)
+    nb.add_box(mats["dark_steel"], sx, sy, 0.94, 0.50, 0.14, 0.08, yaw_rad, ao_bot=0.80, ao_top=0.96)
+    # Weatherproof dark cabinet (w=0.64m, d=0.48m, h=1.30m) + rain hood
+    nb.add_box(mats["dark_steel"], sx, sy, 1.02, 0.64, 0.48, 1.30, yaw_rad, ao_bot=0.80, ao_top=0.96)
+    hood_xy = rot(0.0, -0.03)
+    nb.add_box(mats["dark_steel"], hood_xy[0], hood_xy[1], 2.32, 0.68, 0.56, 0.05, yaw_rad, ao_bot=0.88, ao_top=1.0)
+    # Front speaker grille & dual drivers facing -ly (toward playground)
+    f0 = rot(-0.28, -0.255)
+    f1 = rot(0.28, -0.255)
+    nb.quad_enu(mats["stage"], (f0[0], f0[1], 1.07), (f1[0], f1[1], 1.07), (f1[0], f1[1], 2.27), (f0[0], f0[1], 2.27), UV_PA_SPEAKER, 0.92, 1.0)
+
+
+def add_tapered_monolith(
+    nb: NodeBuilder,
+    cx: float, cy_n: float,
+    tiers: List[Tuple[float, float, float, float, float, float]],
+    mat: int, uv_box: UVBox,
+) -> None:
+    """Stacked tapered granite tiers (z0, z1, w0, d0, w1, d1) forming natural stone monolith."""
+    for idx, (z0, z1, w0, d0, w1, d1) in enumerate(tiers):
+        b = [
+            (cx - w0 * 0.5, cy_n - d0 * 0.5),
+            (cx + w0 * 0.5, cy_n - d0 * 0.5),
+            (cx + w0 * 0.5, cy_n + d0 * 0.5),
+            (cx - w0 * 0.5, cy_n + d0 * 0.5),
+        ]
+        t = [
+            (cx - w1 * 0.5, cy_n - d1 * 0.5),
+            (cx + w1 * 0.5, cy_n - d1 * 0.5),
+            (cx + w1 * 0.5, cy_n + d1 * 0.5),
+            (cx - w1 * 0.5, cy_n + d1 * 0.5),
+        ]
+        ao0 = 0.78 + idx * 0.04
+        ao1 = min(1.0, 0.84 + idx * 0.04)
+        for k in range(4):
+            kn = (k + 1) % 4
+            nb.quad_enu(
+                mat,
+                (b[k][0], b[k][1], z0), (b[kn][0], b[kn][1], z0),
+                (t[kn][0], t[kn][1], z1), (t[k][0], t[k][1], z1),
+                uv_box, ao0, ao1,
+            )
+        if idx == len(tiers) - 1:
+            nb.quad_enu(
+                mat,
+                (t[0][0], t[0][1], z1), (t[1][0], t[1][1], z1),
+                (t[2][0], t[2][1], z1), (t[3][0], t[3][1], z1),
+                uv_box, ao1, ao1,
+            )
+
+
 # ---------------------------------------------------------------------------
 # WEST CAMPUS (同福夹道3号 校本部)
 # ---------------------------------------------------------------------------
@@ -981,15 +1045,25 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
             rx = -41.5 + rx_i * 1.5
             gnd.add_box(mats["blue_steel"], rx, rack_y, 0.14, 0.08, 0.55, 0.42, 0.0)
 
-    # Green lawn south of B-Wing & C-Wing junction (home to W-L3 冰心像 & W-L1 慎独石)
-    gnd.add_polygon_patch([(-41.5, 42.5), (-4.6, 42.5), (-4.6, 57.5), (-41.5, 57.5)], 0.025, mats["surf"], UV_GRASS, ao=0.94)
+    # Green lawn south of B-Wing & C-Wing junction + forecourt stone strip in front of B座 SE corner
+    gnd.add_polygon_patch(
+        [(-41.5, 42.5), (-5.2, 42.5), (-5.2, 68.0), (-10.2, 68.0), (-35.5, 55.6), (-41.5, 55.6)],
+        0.025, mats["surf"], UV_GRASS, ao=0.94,
+    )
+    gnd.add_polygon_patch(
+        [(-35.5, 55.6), (-10.2, 68.0), (-5.2, 68.0), (-5.2, 72.8), (-5.8, 72.8), (-35.5, 57.5)],
+        0.025, mats["surf"], UV_PLAZA_TILE, ao=0.97,
+    )
+    # Low clipped ornamental shrubs immediately west of 慎独石 along B座 forecourt edge
+    for bsx, bsy, br in ((-8.3, 69.6, 0.48), (-9.4, 69.0, 0.42)):
+        gnd.add_cylinder(mats["leaf"], bsx, bsy, 0.03, br, br * 0.75, br * 1.35, 8, UV_FOLIAGE, ao_bot=0.74, ao_top=0.96)
 
-    # Campus Perimeter Brick Wall (avoiding front gate opening x: -4.5..+3.5 at south gate)
+    # Campus Perimeter Brick Wall (avoiding front gate + left guardhouse x: -11.5..+5.0 at south gate)
     bound = ensure_ccw(ways["352521262"]["pts"])
     for i in range(len(bound)):
         a, b = bound[i], bound[(i + 1) % len(bound)]
-        if a[1] < 8.0 and b[1] < 8.0 and -5.5 <= a[0] <= 5.0 and -5.5 <= b[0] <= 5.0:
-            continue  # Open for West Gate
+        if a[1] < 8.0 and b[1] < 8.0 and -11.5 <= a[0] <= 5.0 and -11.5 <= b[0] <= 5.0:
+            continue  # Open for West Gate & Guardhouse facade
         dx, dy = b[0] - a[0], b[1] - a[1]
         L = math.hypot(dx, dy)
         if L < 0.5:
@@ -997,14 +1071,81 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         yaw = math.atan2(dy, dx)
         gnd.add_box(mats["surf"], (a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, 0.0, L, 0.35, 2.35, yaw, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.96)
 
-    # ---- W-G1: 同福夹道3号正门 ----
+    # ---- W-G1: 同福夹道3号正门 + 左侧大理石保安厅（含转角观察窗、东侧出入门与挑檐） ----
     gate = exp.add_node("W-G1")
-    gate.add_box(mats["gates"], -4.5, 5.2, 0.0, 1.5, 1.5, 4.4, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.98)
-    gate.add_box(mats["gates"], 3.2, 5.2, 0.0, 1.5, 1.5, 4.4, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.98)
-    gate.add_box(mats["gates"], -8.0, 7.2, 0.0, 6.2, 4.6, 3.6, 0.0, UV_MARBLE, ao_bot=0.74, ao_top=0.95)
-    gate.quad_enu(mats["glass"], (-6.0, 4.86, 1.0), (-4.95, 4.86, 1.0), (-4.95, 4.86, 2.9), (-6.0, 4.86, 2.9), UV_GLASS_WINDOW)
-    gate.add_box(mats["gates"], -0.65, 5.1, 4.35, 12.8, 1.9, 1.35, 0.0, UV_WEST_FASCIA, ao_bot=0.82, ao_top=1.0)
-    gate.quad_enu(mats["led"], (-5.5, 4.12, 4.42), (3.8, 4.12, 4.42), (3.8, 4.12, 5.62), (-5.5, 4.12, 5.62), UV_WEST_FASCIA, 1.0, 1.0)
+    # Twin marble gate piers
+    gate.add_box(mats["gates"], -4.2, 5.2, 0.0, 1.2, 1.5, 4.4, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.98)
+    gate.add_box(mats["gates"], 3.2, 5.2, 0.0, 1.4, 1.5, 4.4, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.98)
+    # Guardhouse (left/west of gate: x -10.90..-5.65, y 4.80..10.40) with recessed doors & windows
+    gate.add_box(mats["gates"], -8.275, 7.60, 0.0, 5.25, 5.60, 0.10, 0.0, UV_MARBLE, ao_bot=0.74, ao_top=0.90)
+    gate.add_box(mats["gates"], -8.275, 7.60, 3.32, 5.25, 5.60, 0.28, 0.0, UV_MARBLE, ao_bot=0.86, ao_top=0.96, top_mat=mats["surf"], top_uv=UV_PLAZA_TILE)
+    # White aluminum overhanging canopy extending east to join left gate pier
+    gate.add_box(mats["white_alu"], -7.875, 7.60, 3.58, 6.35, 5.80, 0.30, 0.0, ao_bot=0.88, ao_top=1.0, top_mat=mats["surf"], top_uv=UV_PLAZA_TILE)
+    # South marble wall (SW solid pier + window apron) + recessed SE corner service window
+    gate.add_box(mats["gates"], -9.875, 4.98, 0.10, 2.05, 0.36, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    gate.quad_enu(mats["gates"], (-10.35, 4.78, 2.25), (-9.35, 4.78, 2.25), (-9.35, 4.78, 2.85), (-10.35, 4.78, 2.85), UV_EAST_SIGN, 0.92, 1.0)
+    gate.quad_enu(mats["crimson"], (-10.08, 4.77, 1.82), (-9.62, 4.77, 1.82), (-9.62, 4.77, 2.12), (-10.08, 4.77, 2.12), (0.1, 0.1, 0.9, 0.9), 0.94, 1.0)
+    gate.add_box(mats["gates"], -7.25, 4.98, 0.10, 3.20, 0.36, 0.95, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.94)
+    gate.add_box(mats["gates"], -7.25, 4.93, 1.01, 3.24, 0.44, 0.05, 0.0, UV_MARBLE, ao_bot=0.84, ao_top=0.98)
+    gate.quad_enu(mats["glass"], (-8.85, 4.94, 1.05), (-5.79, 4.94, 1.05), (-5.79, 4.94, 3.32), (-8.85, 4.94, 3.32), UV_GLASS_WINDOW)
+    gate.add_box(mats["dark_steel"], -8.81, 4.90, 1.05, 0.08, 0.10, 2.27, 0.0)
+    gate.add_box(mats["dark_steel"], -7.25, 4.90, 1.05, 0.07, 0.10, 2.27, 0.0)
+    gate.add_box(mats["dark_steel"], -7.32, 4.90, 2.18, 3.06, 0.10, 0.08, 0.0)
+    gate.add_box(mats["dark_steel"], -7.32, 4.90, 3.27, 3.06, 0.10, 0.08, 0.0)
+    gate.add_box(mats["dark_steel"], -7.32, 4.90, 1.06, 3.06, 0.10, 0.06, 0.0)
+    gate.add_box(mats["dark_steel"], -6.52, 4.91, 1.09, 0.05, 0.08, 1.08, 0.0)  # Sliding service sash divider
+    # Corner steel post joining South & East glass corner window
+    gate.add_box(mats["dark_steel"], -5.72, 4.88, 1.05, 0.18, 0.18, 2.27, 0.0)
+    # East wall (facing main entry driveway: SE corner window + entrance glass door + north window)
+    gate.add_box(mats["gates"], -5.83, 6.145, 0.10, 0.36, 2.41, 0.95, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.94)
+    gate.add_box(mats["gates"], -5.79, 6.145, 1.01, 0.44, 2.45, 0.05, 0.0, UV_MARBLE, ao_bot=0.84, ao_top=0.98)
+    gate.quad_enu(mats["glass"], (-5.79, 4.94, 1.05), (-5.79, 7.35, 1.05), (-5.79, 7.35, 3.32), (-5.79, 4.94, 3.32), UV_GLASS_WINDOW)
+    gate.add_box(mats["dark_steel"], -5.75, 7.31, 1.05, 0.10, 0.08, 2.27, 0.0)
+    gate.add_box(mats["dark_steel"], -5.75, 6.15, 1.05, 0.10, 0.07, 2.27, 0.0)
+    gate.add_box(mats["dark_steel"], -5.75, 6.145, 2.18, 0.10, 2.41, 0.08, 0.0)
+    gate.add_box(mats["dark_steel"], -5.75, 6.145, 3.27, 0.10, 2.41, 0.08, 0.0)
+    gate.add_box(mats["dark_steel"], -5.75, 6.145, 1.06, 0.10, 2.41, 0.06, 0.0)
+    # Pier between corner window & guardhouse door
+    gate.add_box(mats["gates"], -5.83, 7.50, 0.10, 0.36, 0.30, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    # Guardhouse East Entrance Doorway (y: 7.65..8.85) with granite step, door frame, transom & handle
+    gate.add_box(mats["surf"], -5.465, 8.25, 0.0, 0.37, 1.40, 0.10, 0.0, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.94)
+    gate.add_box(mats["gates"], -5.83, 8.25, 2.35, 0.36, 1.20, 0.97, 0.0, UV_MARBLE, ao_bot=0.82, ao_top=0.95)
+    gate.add_box(mats["dark_steel"], -5.77, 7.69, 0.10, 0.12, 0.08, 2.25, 0.0)
+    gate.add_box(mats["dark_steel"], -5.77, 8.81, 0.10, 0.12, 0.08, 2.25, 0.0)
+    gate.add_box(mats["dark_steel"], -5.77, 8.25, 2.29, 0.12, 1.20, 0.06, 0.0)
+    gate.add_box(mats["dark_steel"], -5.77, 8.25, 2.02, 0.12, 1.16, 0.06, 0.0)
+    gate.add_box(mats["dark_steel"], -5.80, 8.25, 0.10, 0.06, 1.06, 0.82, 0.0)
+    gate.quad_enu(mats["glass"], (-5.79, 7.72, 0.92), (-5.79, 8.78, 0.92), (-5.79, 8.78, 2.29), (-5.79, 7.72, 2.29), UV_GLASS_WINDOW)
+    gate.add_box(mats["white_alu"], -5.73, 7.84, 0.96, 0.05, 0.05, 0.38, 0.0)
+    # Pier & East North-bay window (y: 8.85..10.40)
+    gate.add_box(mats["gates"], -5.83, 8.975, 0.10, 0.36, 0.25, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    gate.add_box(mats["gates"], -5.83, 9.625, 0.10, 0.36, 1.05, 1.05, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.94)
+    gate.add_box(mats["gates"], -5.83, 9.625, 2.95, 0.36, 1.05, 0.37, 0.0, UV_MARBLE, ao_bot=0.84, ao_top=0.95)
+    gate.add_box(mats["gates"], -5.79, 9.625, 1.11, 0.44, 1.08, 0.05, 0.0, UV_MARBLE, ao_bot=0.84, ao_top=0.98)
+    gate.quad_enu(mats["glass"], (-5.79, 9.10, 1.15), (-5.79, 10.15, 1.15), (-5.79, 10.15, 2.95), (-5.79, 9.10, 2.95), UV_GLASS_WINDOW)
+    gate.add_box(mats["dark_steel"], -5.75, 9.625, 1.15, 0.09, 0.06, 1.80, 0.0)
+    gate.add_box(mats["dark_steel"], -5.75, 9.625, 2.90, 0.09, 1.05, 0.06, 0.0)
+    gate.add_box(mats["dark_steel"], -5.75, 9.625, 1.16, 0.09, 1.05, 0.05, 0.0)
+    gate.add_box(mats["gates"], -5.83, 10.275, 0.10, 0.36, 0.25, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    # West wall with recessed daylight window + North solid wall
+    gate.add_box(mats["gates"], -10.72, 5.68, 0.10, 0.36, 1.04, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    gate.add_box(mats["gates"], -10.72, 7.60, 0.10, 0.36, 2.80, 1.05, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.94)
+    gate.add_box(mats["gates"], -10.72, 7.60, 2.95, 0.36, 2.80, 0.37, 0.0, UV_MARBLE, ao_bot=0.84, ao_top=0.95)
+    gate.quad_enu(mats["glass"], (-10.76, 9.00, 1.15), (-10.76, 6.20, 1.15), (-10.76, 6.20, 2.95), (-10.76, 9.00, 2.95), UV_GLASS_WINDOW)
+    gate.add_box(mats["dark_steel"], -10.80, 7.60, 1.15, 0.08, 0.06, 1.80, 0.0)
+    gate.add_box(mats["dark_steel"], -10.80, 7.60, 2.90, 0.08, 2.80, 0.06, 0.0)
+    gate.add_box(mats["dark_steel"], -10.80, 7.60, 1.16, 0.08, 2.80, 0.05, 0.0)
+    gate.add_box(mats["gates"], -10.72, 9.70, 0.10, 0.36, 1.40, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    gate.add_box(mats["gates"], -8.275, 10.22, 0.10, 4.53, 0.36, 3.22, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+    # Pedestrian passage lintel & glazed doorway frame between guardhouse and left gate pier
+    gate.add_box(mats["gates"], -5.225, 5.375, 3.35, 0.85, 1.15, 1.00, 0.0, UV_MARBLE, ao_bot=0.80, ao_top=0.96)
+    gate.add_box(mats["dark_steel"], -5.60, 5.05, 0.0, 0.07, 0.09, 2.25, 0.0)
+    gate.add_box(mats["dark_steel"], -4.85, 5.05, 0.0, 0.07, 0.09, 2.25, 0.0)
+    gate.add_box(mats["dark_steel"], -5.225, 5.05, 2.20, 0.85, 0.09, 0.08, 0.0)
+    gate.add_box(mats["dark_steel"], -5.60, 5.35, 0.05, 0.05, 0.58, 2.12, 0.0)
+    # Overhead fascia header, LED banner & gold-framed school plaque on East pier
+    gate.add_box(mats["gates"], -2.05, 5.15, 4.35, 13.0, 1.95, 1.35, 0.0, UV_WEST_FASCIA, ao_bot=0.82, ao_top=1.0)
+    gate.quad_enu(mats["led"], (-6.0, 4.16, 4.46), (3.8, 4.16, 4.46), (3.8, 4.16, 5.60), (-6.0, 4.16, 5.60), UV_WEST_FASCIA, 1.0, 1.0)
     gate.quad_enu(mats["gates"], (2.68, 4.42, 0.9), (3.72, 4.42, 0.9), (3.72, 4.42, 3.45), (2.68, 4.42, 3.45), UV_WEST_PLAQUE, 0.95, 1.0)
     for wing_x in (-3.25, 1.95):
         gate.add_box(mats["dark_steel"], wing_x, 6.8, 0.15, 0.12, 3.1, 2.2, 0.0, ao_bot=0.80, ao_top=1.0)
@@ -1017,13 +1158,21 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         xoff = -3.4 + hi * 1.8
         gate.quad_enu(mats["yellow_hatch"], (xoff, -2.0, 0.015), (xoff + 0.14, -2.0, 0.015), (xoff + 0.14, 3.6, 0.015), (xoff, 3.6, 0.015))
 
-    # ---- W-L1: 慎独石 (located at SE lawn south of B座, facing South driveway) ----
+    # ---- W-L1: 慎独石 (located in front of B座 SE corner, facing South driveway) ----
     shendu = exp.add_node("W-L1")
-    shendu.add_polygon_patch([(-9.0, 52.8), (-4.8, 52.8), (-4.8, 57.6), (-9.0, 57.6)], 0.04, mats["surf"], UV_GRASS, ao=0.92)
-    shendu.add_box(mats["gates"], -6.8, 55.2, 0.04, 2.6, 1.8, 0.38, 0.0, UV_BURGUNDY, ao_bot=0.72, ao_top=0.90)
-    shendu.add_box(mats["gates"], -6.8, 55.2, 0.42, 1.45, 0.85, 2.55, 0.0, UV_SHENDU_STONE, ao_bot=0.78, ao_top=0.98)
-    shendu.add_box(mats["gates"], -6.8, 55.2, 2.95, 1.05, 0.60, 0.72, 0.0, UV_MARBLE, ao_bot=0.88, ao_top=1.0)
-    shendu.quad_enu(mats["gates"], (-7.52, 54.73, 0.50), (-6.08, 54.73, 0.50), (-6.08, 54.73, 3.05), (-7.52, 54.73, 3.05), UV_SHENDU_STONE, 0.90, 1.0)
+    shendu.add_box(mats["surf"], -6.6, 70.0, 0.025, 1.82, 1.06, 0.16, 0.0, UV_QINGZHUAN, ao_bot=0.72, ao_top=0.90)
+    add_tapered_monolith(
+        shendu,
+        -6.6, 70.0,
+        [
+            (0.18, 1.35, 1.56, 0.86, 1.48, 0.80),
+            (1.35, 2.45, 1.48, 0.80, 1.32, 0.72),
+            (2.45, 3.15, 1.32, 0.72, 0.96, 0.56),
+            (3.15, 3.52, 0.96, 0.56, 0.48, 0.34),
+        ],
+        mats["gates"], UV_SHENDU_GRANITE,
+    )
+    shendu.quad_enu(mats["gates"], (-7.26, 69.55, 0.32), (-5.94, 69.55, 0.32), (-6.12, 69.65, 2.85), (-7.08, 69.65, 2.85), UV_SHENDU_STONE, 0.90, 1.0)
 
     # ---- W-L3: 冰心像 (B座南侧绿地，慎独石以西、坡道下端东北侧) ----
     bx_node = exp.add_node("W-L3")
@@ -1163,8 +1312,24 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         p1 = (cx_arc + rad * math.cos(ang1), cy_arc + rad * math.sin(ang1))
         wb4.quad_enu(mats["surf"], (p0[0], p0[1], 0.0), (p1[0], p1[1], 0.0), (p1[0], p1[1], 4.45), (p0[0], p0[1], 4.45), UV_TERRACOTTA_BRICK, 0.78, 0.94)
         wb4.quad_enu(mats["surf"], (p0[0], p0[1], 4.45), (p1[0], p1[1], 4.45), (p1[0], p1[1], 11.65), (p0[0], p0[1], 11.65), UV_GREY_RIB, 0.88, 0.98)
-    # 1-story south entrance service annex behind West Gate guardhouse
-    wb4.add_box(mats["surf"], -8.2, 17.5, 0.0, 5.4, 14.0, 3.6, 0.0, UV_QINGZHUAN, ao_bot=0.74, ao_top=0.94, top_mat=mats["surf"], top_uv=UV_PLAZA_TILE)
+    # 1-story south entrance service annex behind West Gate guardhouse (with windows & east doorway)
+    wb4.add_detailed_building(
+        [(-10.9, 10.4), (-5.65, 10.4), (-5.65, 24.2), (-10.9, 24.2)],
+        stories=1, story_h=2.95, plinth_h=0.55,
+        wall_mat=mats["surf"], wall_uv=UV_STUCCO,
+        band_mat=mats["surf"], band_uv=UV_QINGZHUAN,
+        roof_mat=mats["surf"], roof_uv=UV_PLAZA_TILE,
+        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
+        mullion_mat=mats["dark_steel"],
+        plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
+        parapet_h=0.32, add_rail=False, bay_w=3.4,
+    )
+    # East entry doorway, granite step & small dark-steel canopy facing main driveway
+    wb4.add_box(mats["surf"], -5.41, 17.25, 0.0, 0.48, 1.50, 0.10, 0.0, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.94)
+    wb4.add_box(mats["dark_steel"], -5.54, 17.25, 0.10, 0.12, 1.32, 2.25, 0.0, ao_bot=0.78, ao_top=0.95)
+    wb4.quad_enu(mats["glass"], (-5.47, 16.65, 0.16), (-5.47, 17.85, 0.16), (-5.47, 17.85, 2.25), (-5.47, 16.65, 2.25), UV_GLASS_WINDOW)
+    wb4.add_box(mats["white_alu"], -5.45, 16.76, 0.96, 0.04, 0.04, 0.34, 0.0)
+    wb4.add_box(mats["dark_steel"], -5.18, 17.25, 2.45, 0.90, 1.65, 0.14, 0.0, ao_bot=0.84, ao_top=1.0)
 
     # ---- W-ST1: 东北外挂折返楼梯塔 & "尚美" 艺术浮雕壁 ----
     wst1 = exp.add_node("W-ST1")
@@ -1286,13 +1451,25 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     wp2.quad_enu(mats["stage"], (st_cx - 6.7, st_cy + 0.32, 0.95), (st_cx - 4.9, st_cy + 0.32, 0.95), (st_cx - 4.9, st_cy + 0.32, 5.75), (st_cx - 6.7, st_cy + 0.32, 5.75), UV_PILLAR_LEFT)
     wp2.add_box(mats["stage"], st_cx + 5.8, st_cy + 0.8, 0.85, 1.9, 0.9, 5.0, 0.0, UV_PILLAR_RIGHT)
     wp2.quad_enu(mats["stage"], (st_cx + 4.9, st_cy + 0.32, 0.95), (st_cx + 6.7, st_cy + 0.32, 0.95), (st_cx + 6.7, st_cy + 0.32, 5.75), (st_cx + 4.9, st_cy + 0.32, 5.75), UV_PILLAR_RIGHT)
-    # Flanking 1-story side wings behind stage
-    wp2.add_box(mats["surf"], st_cx - 14.0, st_cy + 1.0, 0.0, 5.2, 4.2, 3.8, 0.0, UV_QINGZHUAN)
-    wp2.add_box(mats["surf"], st_cx + 14.0, st_cy + 1.0, 0.0, 5.2, 4.2, 3.8, 0.0, UV_QINGZHUAN)
+    # Side steps & stainless steel deck railings on left/right wings of podium
+    for sx_step in (st_cx - 11.45, st_cx + 11.45):
+        wp2.add_box(mats["gates"], sx_step, st_cy + 0.6, 0.0, 0.9, 2.6, 0.55, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.95)
+        wp2.add_box(mats["gates"], sx_step + (-0.6 if sx_step < st_cx else 0.6), st_cy + 0.6, 0.0, 0.5, 2.6, 0.28, 0.0, UV_MARBLE)
+    for rx_rail in (st_cx - 10.9, st_cx + 10.9):
+        wp2.add_box(mats["white_alu"], rx_rail, st_cy, 1.76, 0.06, 5.8, 0.06, 0.0)
+        for ry_post in (st_cy - 2.8, st_cy, st_cy + 2.8):
+            wp2.add_box(mats["white_alu"], rx_rail, ry_post, 0.85, 0.06, 0.06, 0.95, 0.0)
+    # Compact weatherproof PA speakers flanking left & right sides of stage (angled slightly toward court center)
+    add_pa_speaker_stack(wp2, st_cx - 11.4, st_cy - 0.8, 0.15, mats)
+    add_pa_speaker_stack(wp2, st_cx + 11.4, st_cy - 0.8, -0.15, mats)
     # 3-Span Doubly-Curved Tensile Membrane Roof spanning East-West (-54.5..-33.5) & arching South-North
     for cx_col in (st_cx - 10.5, st_cx - 3.5, st_cx + 3.5, st_cx + 10.5):
         wp2.add_cylinder(mats["dark_steel"], cx_col, st_cy + 2.6, 0.85, 0.16, 0.16, 5.8, 8)
         wp2.add_cylinder(mats["dark_steel"], cx_col, st_cy - 2.8, 0.85, 0.14, 0.14, 6.8, 8)
+    # Compact upper column-mounted fill speakers on outer front steel columns
+    for col_x in (st_cx - 10.5, st_cx + 10.5):
+        wp2.add_box(mats["dark_steel"], col_x, st_cy - 2.98, 4.10, 0.30, 0.24, 0.58, 0.0, ao_bot=0.82, ao_top=0.98)
+        wp2.quad_enu(mats["stage"], (col_x - 0.14, st_cy - 3.11, 4.13), (col_x + 0.14, st_cy - 3.11, 4.13), (col_x + 0.14, st_cy - 3.11, 4.65), (col_x - 0.14, st_cy - 3.11, 4.65), UV_PA_SPEAKER, 0.92, 1.0)
     for span in range(3):
         xA = (st_cx - 10.5) + span * 7.0
         xB = xA + 7.0
@@ -1302,11 +1479,19 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
             z0 = 6.2 + 2.4 * math.sin(t0 * math.pi)
             z1 = 6.2 + 2.4 * math.sin(t1 * math.pi)
             wp2.quad_enu(mats["tensile"], (xA, y0, z0), (xB, y0, z0), (xB, y1, z1), (xA, y1, z1), (0.0, 0.0, 1.0, 1.0), 0.92, 1.0, double_sided=True)
-    # Flagpole & Red Flag on East front side of stage facing Playground
-    fx, fy = -29.8, 126.2
-    wp2.add_box(mats["gates"], fx, fy, 0.0, 2.4, 2.4, 0.55, 0.0, UV_MARBLE)
-    wp2.add_cylinder(mats["white_alu"], fx, fy, 0.55, 0.10, 0.05, 14.5, 8)
-    wp2.quad_enu(mats["gates"], (fx, fy, 13.0), (fx + 2.4, fy - 0.3, 13.0), (fx + 2.4, fy - 0.3, 14.7), (fx, fy, 14.7), UV_FLAG, 0.95, 1.0, double_sided=True)
+    # Flagpole & Red Flag on LEFT (West) side of stage when viewed from playground
+    fx, fy = -58.8, 126.4
+    wp2.add_box(mats["gates"], fx, fy, 0.0, 2.2, 2.2, 0.48, 0.0, UV_MARBLE, ao_bot=0.76, ao_top=0.96)
+    for px_off in (-1.0, 1.0):
+        for py_off in (-1.0, 1.0):
+            wp2.add_box(mats["white_alu"], fx + px_off, fy + py_off, 0.48, 0.05, 0.05, 0.57, 0.0)
+    wp2.add_box(mats["white_alu"], fx, fy - 1.0, 1.03, 2.04, 0.04, 0.04, 0.0)
+    wp2.add_box(mats["white_alu"], fx, fy + 1.0, 1.03, 2.04, 0.04, 0.04, 0.0)
+    wp2.add_box(mats["white_alu"], fx - 1.0, fy, 1.03, 0.04, 2.04, 0.04, 0.0)
+    wp2.add_box(mats["white_alu"], fx + 1.0, fy, 1.03, 0.04, 2.04, 0.04, 0.0)
+    wp2.add_cylinder(mats["white_alu"], fx, fy, 0.48, 0.10, 0.045, 14.5, 10)
+    wp2.add_cylinder(mats["gold_trim"], fx, fy, 14.98, 0.11, 0.03, 0.16, 10)
+    wp2.quad_enu(mats["gates"], (fx + 0.05, fy, 13.15), (fx + 2.45, fy - 0.22, 13.15), (fx + 2.45, fy - 0.22, 14.75), (fx + 0.05, fy, 14.75), UV_FLAG, 0.96, 1.0, double_sided=True)
 
     # ---- W-B5: 高二平房区（操场北侧 · 1层平顶教学平房） ----
     wb5 = exp.add_node("W-B5")
@@ -1397,7 +1582,7 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         m_side = mats["context_blue"] if is_blue_ref else mats["context"]
         ctx_w.add_polygon_slab(pts, 0.0, h, mats["context"], m_side, (0.0, 0.0, 1.0, 1.0), (0.0, 0.0, 1.0, 1.0), ao_bot=0.72, ao_top=0.95)
     # Campus & east passage trees
-    for tx, ty, sp, th in [(-22, 52, "broad", 8.5), (-35, 51, "broad", 8.0), (-8, 12, "broad", 7.2), (1.0, 26, "broad", 7.8), (1.0, 44, "broad", 7.8)]:
+    for tx, ty, sp, th in [(-22, 52, "broad", 8.5), (-35, 51, "broad", 8.0), (-9.2, 25.6, "broad", 7.2), (1.0, 26, "broad", 7.8), (1.0, 44, "broad", 7.8)]:
         ctx_w.add_tree(tx, ty, sp, th, mats["trunk"], mats["leaf"])
 
     return exp.write_glb(out_glb)

@@ -221,7 +221,7 @@ def build_west_scene(west_json: dict, mats: Dict[str, bpy.types.Material], root_
 
     add_extruded_polygon("Campus_Ground_West", ways["352521262"]["pts"], -0.18, 0.18, mats["ground"], root_col)
     add_box("W-G1", -1.2, 7.6, 0.0, 14.0, 4.6, 5.4, mats["brick_red"], root_col, bevel_width=0.04)
-    add_box("W-L1", -6.8, 55.2, 0.0, 3.0, 1.4, 3.3, mats["qingzhuan"], root_col, bevel_width=0.05)
+    add_box("W-L1", -6.6, 70.0, 0.0, 1.8, 1.0, 3.52, mats["qingzhuan"], root_col, bevel_width=0.05)
     add_box("W-L3", -16.5, 52.0, 0.0, 1.3, 1.3, 2.55, mats["bronze"], root_col, bevel_width=0.04)
 
     # Central teaching complex: C座 (W-B1, 6F taller) + 楼梯间 (W-B2, 6F) + B座 (W-B3, 6F NE inflection)
