@@ -1,10 +1,10 @@
-# 北京市第一六六中学三维校园外围地图（非官方 · `map.bj166zx.cn`）
+# 北京市第一六六中学三维校园地图（`map.bj166zx.cn`）
 
-基于 **Next.js 15 (App Router) + TypeScript + Three.js + glTF 2.0 (`.glb`) / Blender** 构建的北京市第一六六中学（非官方）双校区校园外围三维导览地图项目，涵盖**西校区（同福夹道3号校本部）** 与 **东校区（东四六条甲44号毕业年级部）**，现阶段聚焦校园外部建筑体量、校门牌匾与户外广场，不涉及室内结构。
+基于 **Next.js 15 (App Router) + TypeScript + Three.js + glTF 2.0 (`.glb`) / Blender** 构建的北京市第一六六中学双校区三维校园导览地图项目，涵盖**西校区（同福夹道3号校本部）** 与 **东校区（东四六条甲44号毕业年级部）**，当前以校园建筑体量、校门牌匾与户外公共空间为主，室内导览将随资料与建模进度逐步补充。
 
 生产环境沿用 `bj166-school-site` 的单主机架构，部署于公网 VPS `sofia-vps`（hostname `r-server89187-mls`，IP `108.165.233.143`），由 `edge-caddy` 负责反向代理与 TLS 终结，与 `bj166-web` 端口及容器网络完全隔离。
 
-> **免责声明**：本站为学生/校友开源技术协作维护的非官方项目，不代表北京市第一六六中学或任何教育行政部门发布。地图几何与建筑信息仅整理自 OpenStreetMap 公开矢量、公开实景照片与新闻文献，不得作为正式入校或安防管理依据。
+> **免责声明**：本站为非官方项目，不代表北京市第一六六中学或任何教育行政部门。完整免责声明、隐私说明与全部资料来源见 `https://map.bj166zx.cn/disclaimer`。
 
 ---
 
@@ -39,7 +39,7 @@
 │   ├── maps/map-mark.svg             站点图标
 │   └── models/                       west-campus.glb / east-campus.glb
 ├── src/
-│   ├── app/                          首页地图工作台 (/)、项目与图源说明 (/about)、404
+│   ├── app/                          首页地图工作台 (/)、项目介绍 (/about)、免责声明与资料来源 (/disclaimer)、404
 │   ├── components/                   CampusScene3D、CampusMap2D、PlaceDetailDrawer 等
 │   └── data/                         campuses.ts / places.ts / tours.ts / sources.ts / map2dGeometry.ts
 ├── Dockerfile                        Node 20 Alpine 多阶段最小化生产镜像

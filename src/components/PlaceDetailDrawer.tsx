@@ -93,7 +93,7 @@ export function PlaceDetailDrawer({
 
         <section style={{ marginBottom: "14px" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: "13px", color: "#0b3f70" }}>
-            外围建筑概览
+            建筑概览
           </h3>
           <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.65, color: "#1f2d3d" }}>
             {place.summary}

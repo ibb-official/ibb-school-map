@@ -24,7 +24,7 @@ export default function NotFoundPage() {
             未找到该校园地图页面
           </h2>
           <p style={{ margin: "0 0 18px", fontSize: "13.5px", color: "#516175", lineHeight: 1.65 }}>
-            您访问的路径不存在或已调整，请返回双校区三维外围地图主页继续浏览。
+            您访问的路径不存在或已调整，请返回双校区三维地图主页继续浏览。
           </p>
           <Link
             href="/"
