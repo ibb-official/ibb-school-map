@@ -650,6 +650,147 @@ input {
   pointer-events: none;
 }
 
+.compass-3d-widget {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 19;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 7px 5px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-pill);
+  cursor: pointer;
+  transition: right 0.22s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.compass-3d-widget:hover {
+  border-color: rgba(11, 63, 112, 0.42);
+  transform: translateY(-1px);
+}
+
+.compass-3d-widget-shifted {
+  right: 382px;
+}
+
+.compass-dial {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  transform: rotate(var(--compass-rot, 0deg));
+  transform-origin: center center;
+}
+
+.compass-needle-svg {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  display: block;
+}
+
+.compass-cardinal {
+  position: absolute;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  color: #475569;
+  user-select: none;
+  transform: rotate(calc(-1 * var(--compass-rot, 0deg)));
+}
+
+.compass-cardinal-n {
+  top: 0;
+  left: 50%;
+  margin-left: -5px;
+  color: #c9332b;
+}
+
+.compass-cardinal-e {
+  top: 50%;
+  right: 0;
+  margin-top: -5px;
+}
+
+.compass-cardinal-s {
+  bottom: 0;
+  left: 50%;
+  margin-left: -5px;
+}
+
+.compass-cardinal-w {
+  top: 50%;
+  left: 0;
+  margin-top: -5px;
+}
+
+.compass-sublabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--bj166-navy);
+  line-height: 1.1;
+}
+
+.map2d-top-hud {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: right 0.22s ease;
+}
+
+.map2d-top-hud-shifted {
+  right: 382px;
+}
+
+.map2d-compass-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--bj166-navy);
+  box-shadow: var(--shadow-pill);
+  user-select: none;
+}
+
+@media (max-width: 860px) {
+  .compass-3d-widget-shifted,
+  .map2d-top-hud-shifted {
+    right: 14px;
+  }
+
+  .compass-3d-widget {
+    padding: 5px 6px 4px;
+  }
+
+  .compass-dial {
+    width: 50px;
+    height: 50px;
+  }
+
+  .compass-needle-svg {
+    top: 5px;
+    left: 5px;
+  }
+
+  .map2d-compass-pill span {
+    display: none;
+  }
+}
+
 /* About Page */
 .about-container {
   max-width: 1080px;

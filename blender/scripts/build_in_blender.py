@@ -235,7 +235,7 @@ def build_west_scene(west_json: dict, mats: Dict[str, bpy.types.Material], root_
 
     add_extruded_polygon("W-B4", ways["636389217"]["pts"], 0.0, 11.4, mats["stucco"], root_col, 0.04)
     add_box("W-ST1", -6.8, 80.5, 0.0, 6.2, 5.8, 21.0, mats["dark_steel"], root_col, bevel_width=0.03)
-    add_box("W-MC", -91.2, 77.8, 0.0, 4.6, 22.4, 4.6, mats["skylight"], root_col, bevel_width=0.03)
+    add_box("W-MC", -91.2, 67.8, 0.0, 4.4, 27.5, 4.6, mats["skylight"], root_col, bevel_width=0.03)
     add_box("W-L2", -56.4, 48.0, 0.0, 18.0, 12.0, 0.12, mats["ground"], root_col, bevel_width=0.02)
     add_box("W-P1", -48.8, 106.0, 0.0, 81.5, 37.0, 0.14, mats["track"], root_col, bevel_width=0.0)
     add_box("W-P2", -44.0, 129.0, 0.0, 22.0, 6.0, 5.1, mats["tensile"], root_col, bevel_width=0.04)
