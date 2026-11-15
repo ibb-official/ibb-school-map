@@ -266,12 +266,23 @@ export function CampusMap2D({
                 </text>
               </g>
 
-              {/* North Arrow */}
+              {/* Compass Rose (上北下南 · 左西右东) */}
               <g transform="translate(830, -1330)">
-                <circle r="34" fill="#ffffff" stroke="#0b3f70" strokeWidth="3" />
-                <polygon points="0,-24 -11,14 0,6 11,14" fill="#0b3f70" />
-                <text x="0" y="29" textAnchor="middle" fontSize="16" fontWeight="700" fill="#0b3f70">
-                  N
+                <circle r="44" fill="#ffffff" stroke="#0b3f70" strokeWidth="2.8" />
+                <circle r="33" fill="none" stroke="rgba(11,63,112,0.16)" strokeWidth="1.2" />
+                <polygon points="0,-18 -6,0 0,-2 6,0" fill="#c9332b" />
+                <polygon points="0,18 -6,0 0,2 6,0" fill="#94a3b8" />
+                <text x="0" y="-25" textAnchor="middle" fontSize="13" fontWeight="700" fill="#c9332b">
+                  北
+                </text>
+                <text x="0" y="36" textAnchor="middle" fontSize="11.5" fontWeight="600" fill="#475569">
+                  南
+                </text>
+                <text x="-30" y="4.5" textAnchor="middle" fontSize="11.5" fontWeight="600" fill="#475569">
+                  西
+                </text>
+                <text x="30" y="4.5" textAnchor="middle" fontSize="11.5" fontWeight="600" fill="#475569">
+                  东
                 </text>
               </g>
             </svg>
@@ -362,15 +373,20 @@ export function CampusMap2D({
       )}
 
       <div
-        style={{
-          position: "absolute",
-          top: "14px",
-          right: "14px",
-          zIndex: 18,
-          display: "flex",
-          gap: "6px",
-        }}
+        className={`map2d-top-hud${selectedPlaceId ? " map2d-top-hud-shifted" : ""}`}
       >
+        <div
+          className="map2d-compass-pill"
+          title="2D 平面图固定为上北下南、左西右东"
+          aria-label="方向指北针：上北下南，左西右东"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="12" r="10.5" fill="#ffffff" stroke="#0b3f70" strokeWidth="1.2" />
+            <polygon points="12,3 9.2,12 12,10.8 14.8,12" fill="#c9332b" />
+            <polygon points="12,21 9.2,12 12,13.2 14.8,12" fill="#94a3b8" />
+          </svg>
+          <span>上北下南</span>
+        </div>
         <button
           type="button"
           className="tool-btn"
@@ -460,10 +476,10 @@ export function CampusMap2D({
           );
         })}
 
-        {/* West Campus Oval Track Lanes & 3 Basketball Courts Markings */}
+        {/* West Campus Oval Track Lanes & NE 50m Start + 3 Basketball Courts Markings */}
         {campusId === "west" && (
           <g pointerEvents="none" fill="none" stroke="rgba(255,255,255,0.88)">
-            {[15.35, 16.4, 17.45].map((r) => {
+            {[14.35, 15.35, 16.4, 17.45, 18.45].map((r) => {
               const inset = 18.5 - r;
               const x = -89.5 + inset;
               const y = -(124.5 - inset);
@@ -478,10 +494,22 @@ export function CampusMap2D({
                   height={h}
                   rx={r}
                   ry={r}
-                  strokeWidth="0.32"
+                  strokeWidth="0.3"
                 />
               );
             })}
+            {[-120.35, -121.35, -122.4, -123.45, -124.45].map((ly) => (
+              <line
+                key={`ne-lane-${ly}`}
+                x1={-26.6}
+                y1={ly}
+                x2={-6.5}
+                y2={ly}
+                strokeWidth="0.3"
+              />
+            ))}
+            <line x1={-7.0} y1={-124.48} x2={-7.0} y2={-120.32} strokeWidth="0.38" />
+            <line x1={-57.0} y1={-124.48} x2={-57.0} y2={-120.32} strokeWidth="0.38" />
             {[
               [-69.5, -56.3],
               [-54.7, -41.5],
@@ -554,18 +582,29 @@ export function CampusMap2D({
           );
         })}
 
-        {/* North Arrow & Scale Bar */}
+        {/* Compass Rose (上北下南 · 左西右东) */}
         <g
           transform={
             campusId === "west"
-              ? "translate(14, -142)"
+              ? "translate(13, -141)"
               : "translate(61, -92)"
           }
         >
-          <circle r="7.5" fill="#ffffff" stroke="#0b3f70" strokeWidth="0.7" />
-          <polygon points="0,-5 -2.5,3 0,1.2 2.5,3" fill="#0b3f70" />
-          <text x="0" y="6.2" textAnchor="middle" fontSize="3.4" fontWeight="700" fill="#0b3f70">
-            N
+          <circle r="9.5" fill="#ffffff" stroke="#0b3f70" strokeWidth="0.6" />
+          <circle r="7.2" fill="none" stroke="rgba(11,63,112,0.18)" strokeWidth="0.25" />
+          <polygon points="0,-4.4 -1.8,0.2 0,-0.4 1.8,0.2" fill="#c9332b" />
+          <polygon points="0,4.4 -1.8,0.2 0,0.8 1.8,0.2" fill="#94a3b8" />
+          <text x="0" y="-5.3" textAnchor="middle" fontSize="2.7" fontWeight="700" fill="#c9332b">
+            北
+          </text>
+          <text x="0" y="7.7" textAnchor="middle" fontSize="2.3" fontWeight="600" fill="#475569">
+            南
+          </text>
+          <text x="-6.4" y="0.9" textAnchor="middle" fontSize="2.3" fontWeight="600" fill="#475569">
+            西
+          </text>
+          <text x="6.4" y="0.9" textAnchor="middle" fontSize="2.3" fontWeight="600" fill="#475569">
+            东
           </text>
         </g>
 

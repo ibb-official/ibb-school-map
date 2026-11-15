@@ -94,6 +94,7 @@ export function CampusScene3D({
 }: CampusScene3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const pinElsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const compassDialRef = useRef<HTMLDivElement | null>(null);
 
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
@@ -433,6 +434,16 @@ export function CampusScene3D({
       controls.update();
       renderer.render(scene, camera);
 
+      const compassDialEl = compassDialRef.current;
+      if (compassDialEl) {
+        const vdx = controls.target.x - camera.position.x;
+        const vdz = controls.target.z - camera.position.z;
+        if (Math.hypot(vdx, vdz) > 0.05) {
+          const rotDeg = (Math.atan2(-vdx, -vdz) * 180) / Math.PI;
+          compassDialEl.style.setProperty("--compass-rot", `${rotDeg.toFixed(1)}deg`);
+        }
+      }
+
       // Project floating HTML pins smoothly without React re-renders
       const cw = renderer.domElement.clientWidth;
       const ch = renderer.domElement.clientHeight;
@@ -558,6 +569,20 @@ export function CampusScene3D({
     };
   }, [cameraFlightRequest]);
 
+  const handleAlignNorth = () => {
+    const h = sceneHandlesRef.current;
+    if (!h) return;
+    const { camera, controls } = h;
+    const dx = camera.position.x - controls.target.x;
+    const dz = camera.position.z - controls.target.z;
+    const horizDist = Math.max(Math.hypot(dx, dz), 12);
+    const camY = Math.max(camera.position.y, controls.target.y + 8);
+    h.flightGoal = {
+      pos: new THREE.Vector3(controls.target.x, camY, controls.target.z + horizDist),
+      target: controls.target.clone(),
+    };
+  };
+
   return (
     <>
       <div
@@ -565,6 +590,35 @@ export function CampusScene3D({
         className="scene-canvas-host"
         aria-label={`${campus.name} 三维交互画布`}
       />
+
+      {/* Interactive live 3D directional compass (click to align camera due North) */}
+      <button
+        type="button"
+        className={`compass-3d-widget${selectedPlaceId ? " compass-3d-widget-shifted" : ""}`}
+        onClick={handleAlignNorth}
+        title="实时方向指北针（红针指北，点击一键回正为上北下南）"
+        aria-label="方向指北针：点击回正为上北下南"
+      >
+        <div ref={compassDialRef} className="compass-dial">
+          <span className="compass-cardinal compass-cardinal-n">北</span>
+          <span className="compass-cardinal compass-cardinal-e">东</span>
+          <span className="compass-cardinal compass-cardinal-s">南</span>
+          <span className="compass-cardinal compass-cardinal-w">西</span>
+          <svg
+            viewBox="0 0 40 40"
+            width="40"
+            height="40"
+            className="compass-needle-svg"
+            aria-hidden="true"
+          >
+            <circle cx="20" cy="20" r="14" fill="none" stroke="rgba(11,63,112,0.16)" strokeWidth="1" />
+            <polygon points="20,7 16.4,20 20,18.2 23.6,20" fill="#c9332b" />
+            <polygon points="20,33 16.4,20 20,21.8 23.6,20" fill="#94a3b8" />
+            <circle cx="20" cy="20" r="2.1" fill="#0b3f70" />
+          </svg>
+        </div>
+        <span className="compass-sublabel">回正北向</span>
+      </button>
 
       {showPins && isLoaded && (
         <div className="pins-overlay-layer" aria-label="三维空间点位标签层">

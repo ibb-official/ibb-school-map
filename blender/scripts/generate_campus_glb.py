@@ -1350,31 +1350,51 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     # North-facing "尚美 · 美育浮雕" wall toward playground/plaza
     wst1.quad_enu(mats["stage"], (-3.8, 83.6, 0.35), (-9.5, 83.6, 0.35), (-9.5, 83.6, 3.1), (-3.8, 83.6, 3.1), UV_RELIEF_WALL, 0.90, 1.0)
 
-    # ---- W-MC: 西侧文化走廊 & 音乐长廊 ----
+    # ---- W-MC: 音乐长廊（始于音乐长廊牌楼 y≈81.5，沿 C 座西侧向南延伸；操场西侧不设棚廊） ----
     wmc = exp.add_node("W-MC")
-    # North section of west gallery along track west boundary (y=81.5..123.5)
-    for pi in range(9):
-        py = 82.5 + pi * 5.0
-        wmc.add_box(mats["dark_steel"], -93.4, py, 0.0, 0.22, 0.22, 4.2, 0.0)
-        wmc.add_box(mats["dark_steel"], -90.0, py, 0.0, 0.22, 0.22, 4.2, 0.0)
-        wmc.add_box(mats["dark_steel"], -91.7, py, 4.15, 3.8, 0.20, 0.24, 0.0)
-    wmc.quad_enu(mats["skylight"], (-93.5, 81.5, 4.38), (-89.9, 81.5, 4.38), (-89.9, 123.5, 4.38), (-93.5, 123.5, 4.38), UV_SKYLIGHT, 0.95, 1.0, double_sided=True)
-    # Main Music Corridor glazed entrance portal beside C座 NW corner (y=74.0..81.5)
-    for pi in range(3):
-        py = 74.5 + pi * 3.2
-        wmc.add_box(mats["dark_steel"], -93.5, py, 0.0, 0.26, 0.26, 4.7, 0.0)
-        wmc.add_box(mats["dark_steel"], -88.8, py, 0.0, 0.26, 0.26, 4.7, 0.0)
-        wmc.add_box(mats["dark_steel"], -91.15, py, 4.65, 5.2, 0.24, 0.28, 0.0)
-    wmc.quad_enu(mats["skylight"], (-93.6, 74.0, 4.88), (-88.6, 74.0, 4.88), (-88.6, 81.5, 4.88), (-93.6, 81.5, 4.88), UV_SKYLIGHT, 0.96, 1.0, double_sided=True)
-    # North & South header boards ("音乐长廊 / MUSIC CORRIDOR")
-    wmc.quad_enu(mats["stage"], (-88.7, 81.55, 3.95), (-93.5, 81.55, 3.95), (-93.5, 81.55, 5.05), (-88.7, 81.55, 5.05), UV_MUSIC_SIGN, 0.95, 1.0)
-    wmc.quad_enu(mats["stage"], (-93.5, 73.95, 3.95), (-88.7, 73.95, 3.95), (-88.7, 73.95, 5.05), (-93.5, 73.95, 5.05), UV_MUSIC_SIGN, 0.95, 1.0)
-    # South continuation along west edge beside C座
-    for pi in range(5):
-        py = 56.0 + pi * 4.2
-        wmc.add_box(mats["dark_steel"], -91.2, py, 0.0, 0.20, 0.20, 3.8, 0.0)
-        wmc.add_box(mats["dark_steel"], -89.6, py + 0.5, 3.75, 3.2, 0.18, 0.22, 0.0)
-    wmc.quad_enu(mats["skylight"], (-91.4, 55.0, 3.95), (-88.4, 55.0, 3.95), (-89.8, 74.0, 3.95), (-93.4, 74.0, 3.95), UV_SKYLIGHT, 0.94, 1.0, double_sided=True)
+    # Archway / glazed entrance portal at south edge of track southwest plaza (y=76.25..81.45)
+    portal_bays = [
+        (81.45, -93.50, -89.15),
+        (78.85, -93.42, -89.55),
+        (76.25, -93.35, -89.95),
+    ]
+    for py, xw, xe in portal_bays:
+        wmc.add_box(mats["dark_steel"], xw, py, 0.0, 0.24, 0.24, 4.65, 0.0)
+        wmc.add_box(mats["dark_steel"], xe, py, 0.0, 0.24, 0.24, 4.65, 0.0)
+        wmc.add_box(mats["dark_steel"], (xw + xe) * 0.5, py, 4.55, (xe - xw) + 0.36, 0.22, 0.24, 0.0)
+    # Longitudinal eave beams connecting portal bays (east beam angled cleanly along (-89.95, 76.25)->(-89.15, 81.45))
+    wmc.add_box(mats["dark_steel"], -93.42, 78.85, 4.55, 0.22, 5.45, 0.22, -math.atan2(-0.15, 5.20))
+    wmc.add_box(mats["dark_steel"], -89.55, 78.85, 4.55, 0.22, 5.45, 0.22, -math.atan2(0.80, 5.20))
+    wmc.quad_enu(
+        mats["skylight"],
+        (-93.45, 76.25, 4.78),
+        (-89.88, 76.25, 4.78),
+        (-89.08, 81.45, 4.78),
+        (-93.58, 81.45, 4.78),
+        UV_SKYLIGHT, 0.96, 1.0, double_sided=True,
+    )
+    # North & South header boards ("音乐长廊 / MUSIC CORRIDOR") on the archway
+    wmc.quad_enu(mats["stage"], (-89.15, 81.50, 3.85), (-93.50, 81.50, 3.85), (-93.50, 81.50, 4.92), (-89.15, 81.50, 4.92), UV_MUSIC_SIGN, 0.95, 1.0)
+    wmc.quad_enu(mats["stage"], (-93.35, 76.20, 3.85), (-89.95, 76.20, 3.85), (-89.95, 76.20, 4.92), (-93.35, 76.20, 4.92), UV_MUSIC_SIGN, 0.95, 1.0)
+    # Covered corridor extending south from archway along C-Wing west side (y=54.0..76.25)
+    for pi in range(6):
+        t = pi / 5.0
+        py = 76.25 - t * 22.25
+        xw = -93.35 + t * 1.95   # -93.35 -> -91.40 (inside campus west boundary)
+        xe = -89.95 + t * 1.75   # -89.95 -> -88.20 (clear west of C-Wing west facade)
+        wmc.add_box(mats["dark_steel"], xw, py, 0.0, 0.20, 0.20, 4.00, 0.0)
+        wmc.add_box(mats["dark_steel"], xe, py, 0.0, 0.20, 0.20, 4.00, 0.0)
+        wmc.add_box(mats["dark_steel"], (xw + xe) * 0.5, py, 3.94, (xe - xw) + 0.28, 0.18, 0.20, 0.0)
+    wmc.add_box(mats["dark_steel"], -92.375, 65.125, 3.94, 0.18, 22.35, 0.18, -math.atan2(-1.95, 22.25))
+    wmc.add_box(mats["dark_steel"], -89.075, 65.125, 3.94, 0.18, 22.35, 0.18, -math.atan2(-1.75, 22.25))
+    wmc.quad_enu(
+        mats["skylight"],
+        (-91.50, 54.00, 4.14),
+        (-88.12, 54.00, 4.14),
+        (-89.88, 76.25, 4.14),
+        (-93.45, 76.25, 4.14),
+        UV_SKYLIGHT, 0.94, 1.0, double_sided=True,
+    )
 
     # ---- W-L2: 百草园内庭绿地（无亭子，含草坪、园路、乔灌木） ----
     wl2 = exp.add_node("W-L2")
@@ -1405,19 +1425,26 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
                 pts.append((ccx + rad * math.cos(a), ccy + rad * math.sin(a)))
         return pts
 
-    # 200m Oval EPDM track + western sprint chute extension
+    # 200m Oval EPDM track + NE 50m sprint start chute (y=120.30..124.50, x=-26.8..-6.4)
     wp1.add_polygon_patch(rounded_rect_pts(-89.5, 87.5, -8.0, 124.5, 18.5, n_arc=16), 0.05, mats["surf"], UV_TRACK_EPDM, ao=0.98)
-    wp1.add_polygon_patch([(-91.5, 87.5), (-70.0, 87.5), (-70.0, 91.7), (-91.5, 91.7)], 0.055, mats["surf"], UV_TRACK_EPDM, ao=0.98)
-    # 4 white lane stripe rings
-    for lane_r in (15.35, 16.40, 17.45):
+    wp1.add_polygon_patch([(-26.8, 120.30), (-6.4, 120.30), (-6.4, 124.50), (-26.8, 124.50)], 0.055, mats["surf"], UV_TRACK_EPDM, ao=0.98)
+    # 5 white oval lane boundary rings (inner edge, 3 lane dividers, outer edge)
+    for lane_r in (14.35, 15.35, 16.40, 17.45, 18.45):
         inset = 18.5 - lane_r
         lane_pts = rounded_rect_pts(-89.5 + inset, 87.5 + inset, -8.0 - inset, 124.5 - inset, lane_r, n_arc=16)
         for i in range(len(lane_pts)):
             a, b = lane_pts[i], lane_pts[(i + 1) % len(lane_pts)]
             dx, dy = b[0] - a[0], b[1] - a[1]
             L = max(math.hypot(dx, dy), 0.01)
-            nx, ny = (dy / L) * 0.05, (-dx / L) * 0.05
+            nx, ny = (dy / L) * 0.045, (-dx / L) * 0.045
             wp1.quad_enu(mats["white_alu"], (a[0] - nx, a[1] - ny, 0.07), (b[0] - nx, b[1] - ny, 0.07), (b[0] + nx, b[1] + ny, 0.07), (a[0] + nx, a[1] + ny, 0.07))
+    # NE 50m sprint straightaway lane stripes & Start (x=-7.0) / Finish (x=-57.0) markings
+    for ly in (120.35, 121.35, 122.40, 123.45, 124.45):
+        wp1.quad_enu(mats["white_alu"], (-26.6, ly - 0.045, 0.072), (-6.5, ly - 0.045, 0.072), (-6.5, ly + 0.045, 0.072), (-26.6, ly + 0.045, 0.072))
+    wp1.quad_enu(mats["white_alu"], (-7.06, 120.32, 0.074), (-6.94, 120.32, 0.074), (-6.94, 124.48, 0.074), (-7.06, 124.48, 0.074))
+    wp1.quad_enu(mats["white_alu"], (-57.06, 120.32, 0.074), (-56.94, 120.32, 0.074), (-56.94, 124.48, 0.074), (-57.06, 124.48, 0.074))
+    for lane_mid_y in (120.85, 121.88, 122.92, 123.95):
+        wp1.quad_enu(mats["white_alu"], (-7.55, lane_mid_y - 0.04, 0.074), (-7.20, lane_mid_y - 0.04, 0.074), (-7.20, lane_mid_y + 0.04, 0.074), (-7.55, lane_mid_y + 0.04, 0.074))
     # Green interior athletic surface
     wp1.add_polygon_patch(rounded_rect_pts(-85.3, 91.7, -12.2, 120.3, 14.3, n_arc=16), 0.08, mats["surf"], UV_COURT_GREEN, ao=1.0)
     # 3 N-S full basketball courts inside the oval straightaway + 6 hoops

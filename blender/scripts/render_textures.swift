@@ -525,19 +525,19 @@ do {
         }
     }
 
-    // (0,2) Running Track Terracotta EPDM + White Stripes
+    // (0,2) Running Track Terracotta EPDM (subtle granular texture; lane stripes drawn as clean geometry)
     do {
         let r = cell(0, 2)
         ctx.setFillColor(rgb(0.73, 0.28, 0.21))
         ctx.fill(r)
         srand48(606)
-        for _ in 0..<900 {
-            ctx.setFillColor(rgb(0.65, 0.24, 0.18, 0.45))
+        for _ in 0..<1100 {
+            ctx.setFillColor(rgb(0.65, 0.24, 0.18, 0.42))
             ctx.fill(CGRect(x: r.minX + CGFloat(drand48()) * 254, y: r.minY + CGFloat(drand48()) * 254, width: 3, height: 3))
         }
-        for gy in stride(from: r.minY + 32, to: r.maxY, by: 64) {
-            ctx.setFillColor(rgb(0.95, 0.95, 0.95, 0.9))
-            ctx.fill(CGRect(x: r.minX, y: gy, width: 256, height: 4))
+        for _ in 0..<450 {
+            ctx.setFillColor(rgb(0.80, 0.34, 0.26, 0.25))
+            ctx.fill(CGRect(x: r.minX + CGFloat(drand48()) * 254, y: r.minY + CGFloat(drand48()) * 254, width: 2, height: 2))
         }
     }
 
