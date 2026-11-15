@@ -202,13 +202,40 @@ do {
     ctx.strokeEllipse(in: disc.insetBy(dx: 12, dy: 12))
     drawFlippedText("5", in: CGRect(x: disc.minX, y: disc.minY + 12, width: disc.width, height: disc.height - 20), fontName: "HelveticaNeue-Bold", size: 108, color: .black, align: .center, bold: true)
 
-    // Tile H: Crimson Flag Cloth + Gold Emblems (u: 0.78..1.0, v: 0.78..1.0 -> x:798..1024, y:798..1024)
+    // Tile H: Crimson Flag Cloth + Five Gold Stars (u: 0.78..1.0, v: 0.78..1.0 -> x:798..1024, y:798..1024)
     let flRect = CGRect(x: 798, y: 798, width: 226, height: 226)
     ctx.setFillColor(rgb(0.84, 0.12, 0.11))
     ctx.fill(flRect)
     for sy in stride(from: 808, to: 1020, by: 24) {
         ctx.setFillColor(rgb(0.72, 0.08, 0.08, 0.55))
         ctx.fill(CGRect(x: 798, y: sy, width: 226, height: 8))
+    }
+    func fillStar(center: CGPoint, outerR: CGFloat, innerR: CGFloat, tilt: CGFloat = 0) {
+        ctx.beginPath()
+        for k in 0..<10 {
+            let r = (k % 2 == 0) ? outerR : innerR
+            let ang = -CGFloat.pi / 2.0 + tilt + CGFloat(k) * (.pi / 5.0)
+            let pt = CGPoint(x: center.x + r * cos(ang), y: center.y + r * sin(ang))
+            if k == 0 {
+                ctx.move(to: pt)
+            } else {
+                ctx.addLine(to: pt)
+            }
+        }
+        ctx.closePath()
+        ctx.fillPath()
+    }
+    ctx.setFillColor(rgb(0.98, 0.84, 0.16))
+    let mainStar = CGPoint(x: 834, y: 842)
+    fillStar(center: mainStar, outerR: 22, innerR: 8.6)
+    for pt in [
+        CGPoint(x: 868, y: 818),
+        CGPoint(x: 880, y: 832),
+        CGPoint(x: 880, y: 852),
+        CGPoint(x: 868, y: 868),
+    ] {
+        let angToMain = atan2(mainStar.y - pt.y, mainStar.x - pt.x) + .pi / 2.0
+        fillStar(center: pt, outerR: 7.5, innerR: 2.9, tilt: angToMain)
     }
 
     try savePNG(rep, to: "\(outDir)/tex_signage_gates.png")
@@ -287,6 +314,41 @@ do {
         ctx.stroke(card.insetBy(dx: 6, dy: 6))
         drawFlippedText("C", in: CGRect(x: card.minX, y: card.minY + 6, width: card.width, height: 74), fontName: "TimesNewRomanPS-BoldMT", size: 64, color: .white, align: .center, bold: true)
         drawFlippedText("教学楼", in: CGRect(x: card.minX, y: card.maxY - 40, width: card.width, height: 32), fontName: "PingFangSC-Semibold", size: 22, color: .white, align: .center, bold: true)
+    }
+
+    // Tile E4: Outdoor PA Speaker Front Grille (u: 0.6855..0.7344, v: 0.3340..0.5215 -> x:700..754, y:340..536)
+    do {
+        let spkRect = CGRect(x: 700, y: 340, width: 54, height: 196)
+        ctx.setFillColor(rgb(0.12, 0.13, 0.15))
+        ctx.fill(spkRect)
+        let inner = spkRect.insetBy(dx: 4, dy: 6)
+        ctx.setFillColor(rgb(0.16, 0.17, 0.20))
+        ctx.fill(inner)
+        // Perforated protective metal grille ribs
+        for gy in stride(from: inner.minY + 3, to: inner.maxY - 2, by: 4) {
+            ctx.setFillColor(rgb(0.10, 0.11, 0.13))
+            ctx.fill(CGRect(x: inner.minX + 1, y: gy, width: inner.width - 2, height: 1.5))
+        }
+        // Upper high-frequency horn waveguide
+        let horn = CGRect(x: spkRect.midX - 16, y: 354, width: 32, height: 28)
+        ctx.setFillColor(rgb(0.08, 0.09, 0.11))
+        ctx.fill(horn)
+        ctx.setStrokeColor(rgb(0.28, 0.30, 0.34))
+        ctx.setLineWidth(1.5)
+        ctx.stroke(horn)
+        // Dual mid/low-frequency speaker cones
+        for cy in [418.0, 476.0] as [CGFloat] {
+            let outerC = CGRect(x: spkRect.midX - 18, y: cy - 18, width: 36, height: 36)
+            ctx.setFillColor(rgb(0.26, 0.28, 0.32))
+            ctx.fillEllipse(in: outerC)
+            ctx.setFillColor(rgb(0.08, 0.09, 0.11))
+            ctx.fillEllipse(in: outerC.insetBy(dx: 4, dy: 4))
+            ctx.setFillColor(rgb(0.22, 0.24, 0.27))
+            ctx.fillEllipse(in: outerC.insetBy(dx: 12, dy: 12))
+        }
+        // Bottom silver badge
+        ctx.setFillColor(rgb(0.72, 0.74, 0.78))
+        ctx.fill(CGRect(x: spkRect.midX - 9, y: 516, width: 18, height: 5))
     }
 
     // Tile H: Cafeteria Signboard "学生食堂" (u: 0.8223..0.9922, v: 0.5430..0.6543 -> x:842..1016, y:556..670)
