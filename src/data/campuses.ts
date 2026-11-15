@@ -8,7 +8,7 @@ export const CAMPUSES: Record<CampusId, CampusMeta> = {
     roleLabel: "校本部 / 初中及综合校园",
     address: "北京市东城区同福夹道3号",
     district: "东城区 · 灯市口—东四南片区",
-    modelUrl: "/models/west-campus.glb?v=27ecf1cf",
+    modelUrl: "/models/west-campus.glb?v=40692b64",
     approxAreaSqm: "约 13,500 m²（南北纵深约 137 m × 东西宽约 101 m）",
     defaultCameraPos: [48, 70, 44],
     defaultCameraTarget: [-38, 6, -74],

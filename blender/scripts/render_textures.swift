@@ -363,18 +363,46 @@ do {
         drawFlippedText("DINING HALL", in: CGRect(x: sRect.minX + 8, y: sRect.minY + 72, width: sRect.width - 16, height: 26), fontName: "HelveticaNeue-Bold", size: 14, color: NSColor(red: 0.96, green: 0.86, blue: 0.58, alpha: 1.0), align: .center, bold: true)
     }
 
-    // Tile F: Music Corridor Header Sign (u: 0.36..1.0, v: 0.68..0.84 -> x:368..1024, y:696..860)
-    let mcRect = CGRect(x: 368, y: 696, width: 656, height: 164)
+    // Tile F: Music Corridor Header Sign (u: 0.36..0.7617, v: 0.68..0.832 -> x:368..780, y:696..852)
+    let mcRect = CGRect(x: 368, y: 696, width: 412, height: 156)
     ctx.setFillColor(rgb(0.14, 0.16, 0.18))
     ctx.fill(mcRect)
     ctx.setFillColor(rgb(0.90, 0.65, 0.15))
-    ctx.fillEllipse(in: CGRect(x: 410, y: 722, width: 112, height: 112))
+    ctx.fillEllipse(in: CGRect(x: 386, y: 726, width: 96, height: 96))
     ctx.setFillColor(rgb(0.14, 0.16, 0.18))
-    ctx.fillEllipse(in: CGRect(x: 432, y: 744, width: 68, height: 68))
+    ctx.fillEllipse(in: CGRect(x: 405, y: 745, width: 58, height: 58))
     ctx.setFillColor(rgb(0.96, 0.96, 0.95))
-    ctx.fill(CGRect(x: 560, y: 726, width: 420, height: 104))
-    drawFlippedText("音乐长廊", in: CGRect(x: 560, y: 728, width: 420, height: 62), fontName: "PingFangSC-Semibold", size: 46, color: .black, align: .center, bold: true)
-    drawFlippedText("MUSIC CORRIDOR", in: CGRect(x: 560, y: 788, width: 420, height: 34), fontName: "HelveticaNeue-Bold", size: 20, color: NSColor(white: 0.25, alpha: 1.0), align: .center)
+    ctx.fill(CGRect(x: 498, y: 724, width: 268, height: 100))
+    drawFlippedText("音乐长廊", in: CGRect(x: 500, y: 728, width: 264, height: 58), fontName: "PingFangSC-Semibold", size: 40, color: .black, align: .center, bold: true)
+    drawFlippedText("MUSIC CORRIDOR", in: CGRect(x: 500, y: 786, width: 264, height: 32), fontName: "HelveticaNeue-Bold", size: 17, color: NSColor(white: 0.25, alpha: 1.0), align: .center)
+
+    // Tile I: School History Museum Entrance Plaque "校史馆" (u: 0.7734..0.9922, v: 0.6797..0.7539 -> x:792..1016, y:696..772)
+    do {
+        let hRect = CGRect(x: 792, y: 696, width: 224, height: 76)
+        ctx.setFillColor(rgb(0.42, 0.11, 0.12))
+        ctx.fill(hRect)
+        ctx.setStrokeColor(rgb(0.87, 0.73, 0.40))
+        ctx.setLineWidth(3)
+        ctx.stroke(hRect.insetBy(dx: 4, dy: 4))
+        ctx.setLineWidth(1.2)
+        ctx.stroke(hRect.insetBy(dx: 8, dy: 8))
+        drawFlippedText("校 史 馆", in: CGRect(x: hRect.minX + 10, y: hRect.minY + 10, width: hRect.width - 20, height: 38), fontName: "STKaiti", size: 30, color: NSColor(red: 0.97, green: 0.90, blue: 0.66, alpha: 1.0), align: .center, bold: true)
+        drawFlippedText("SCHOOL HISTORY", in: CGRect(x: hRect.minX + 10, y: hRect.minY + 49, width: hRect.width - 20, height: 18), fontName: "HelveticaNeue-Bold", size: 10, color: NSColor(red: 0.90, green: 0.79, blue: 0.52, alpha: 1.0), align: .center, bold: true)
+    }
+
+    // Tile J: Library Entrance Plaque "图书馆" (u: 0.7734..0.9922, v: 0.7617..0.8359 -> x:792..1016, y:780..856)
+    do {
+        let lRect = CGRect(x: 792, y: 780, width: 224, height: 76)
+        ctx.setFillColor(rgb(0.14, 0.23, 0.35))
+        ctx.fill(lRect)
+        ctx.setStrokeColor(rgb(0.85, 0.72, 0.42))
+        ctx.setLineWidth(3)
+        ctx.stroke(lRect.insetBy(dx: 4, dy: 4))
+        ctx.setLineWidth(1.2)
+        ctx.stroke(lRect.insetBy(dx: 8, dy: 8))
+        drawFlippedText("图 书 馆", in: CGRect(x: lRect.minX + 10, y: lRect.minY + 10, width: lRect.width - 20, height: 38), fontName: "PingFangSC-Semibold", size: 28, color: NSColor(red: 0.98, green: 0.95, blue: 0.86, alpha: 1.0), align: .center, bold: true)
+        drawFlippedText("LIBRARY", in: CGRect(x: lRect.minX + 10, y: lRect.minY + 49, width: lRect.width - 20, height: 18), fontName: "HelveticaNeue-Bold", size: 11, color: NSColor(red: 0.90, green: 0.79, blue: 0.52, alpha: 1.0), align: .center, bold: true)
+    }
 
     // Tile G: Bronze Art Relief Wall (u: 0.36..1.0, v: 0.86..1.0 -> x:368..1024, y:880..1024)
     let relRect = CGRect(x: 368, y: 880, width: 656, height: 144)
