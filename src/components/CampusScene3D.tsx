@@ -197,9 +197,9 @@ export function CampusScene3D({
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.screenSpacePanning = false;
-    controls.minDistance = 12;
+    controls.minDistance = 3.5;
     controls.maxDistance = 260;
-    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.015;
     controls.update();
 
     const hemiLight = new THREE.HemisphereLight(

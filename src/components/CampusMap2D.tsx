@@ -333,7 +333,7 @@ export function CampusMap2D({
   const polys = campusId === "west" ? WEST_2D_POLYGONS : EAST_2D_POLYGONS;
   const viewBox =
     campusId === "west"
-      ? "-178 -154 202 192"
+      ? "-178 -154 220 192"
       : "-55 -105 130 165";
 
   return (
@@ -476,7 +476,7 @@ export function CampusMap2D({
           );
         })}
 
-        {/* West Campus Oval Track Lanes & NE 50m Start + 3 Basketball Courts Markings */}
+        {/* West Campus Oval Track Lanes, Two-Tone Courts, Volleyball Net & Micro-Landmarks */}
         {campusId === "west" && (
           <g pointerEvents="none" fill="none" stroke="rgba(255,255,255,0.88)">
             {[14.35, 15.35, 16.4, 17.45, 18.45].map((r) => {
@@ -514,13 +514,52 @@ export function CampusMap2D({
               [-69.5, -56.3],
               [-54.7, -41.5],
               [-39.9, -26.7],
-            ].map(([cx0, cx1]) => (
-              <g key={`court-${cx0}`} strokeWidth="0.35">
-                <rect x={cx0} y={-118.2} width={cx1 - cx0} height={24.4} />
-                <line x1={cx0} y1={-106.0} x2={cx1} y2={-106.0} />
-                <circle cx={(cx0 + cx1) * 0.5} cy={-106.0} r={1.8} />
-              </g>
-            ))}
+            ].map(([cx0, cx1]) => {
+              const cmid = (cx0 + cx1) * 0.5;
+              return (
+                <g key={`court-${cx0}`} strokeWidth="0.32">
+                  {/* Terracotta 3-second painted keys & center jump circle */}
+                  <rect x={cmid - 2.4} y={-118.2} width={4.8} height={5.6} fill="rgba(194,65,12,0.34)" />
+                  <rect x={cmid - 2.4} y={-99.4} width={4.8} height={5.6} fill="rgba(194,65,12,0.34)" />
+                  <circle cx={cmid} cy={-106.0} r={1.8} fill="rgba(194,65,12,0.34)" />
+                  {/* 3-point arcs */}
+                  <path d={`M ${(cmid - 5.9).toFixed(2)},-116.6 A 6.1,6.1 0 0 0 ${(cmid + 5.9).toFixed(2)},-116.6`} />
+                  <path d={`M ${(cmid - 5.9).toFixed(2)},-95.4 A 6.1,6.1 0 0 1 ${(cmid + 5.9).toFixed(2)},-95.4`} />
+                  {/* Outer boundary & center line */}
+                  <rect x={cx0} y={-118.2} width={cx1 - cx0} height={24.4} />
+                  <line x1={cx0} y1={-106.0} x2={cx1} y2={-106.0} />
+                </g>
+              );
+            })}
+            {/* West Court Volleyball Net */}
+            <line
+              x1={-69.9}
+              y1={-106.0}
+              x2={-55.9}
+              y2={-106.0}
+              stroke="#ea580c"
+              strokeWidth="0.5"
+              strokeDasharray="0.9 0.5"
+            />
+            {/* Skywell Tree (W-H1 North Entrance), Leaning Track-Edge Tree & Taihu Rockery Basin */}
+            <circle cx={-75.05} cy={-134.55} r={1.15} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
+            <circle cx={-19.6} cy={-124.52} r={1.25} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
+            <circle cx={-26.0} cy={-129.8} r={2.2} fill="rgba(100,116,139,0.38)" stroke="#475569" strokeWidth="0.45" />
+            {[-30.0, -21.6, -16.8, -22.0].map((tx, idx) => {
+              const ty = [-128.4, -128.8, -129.0, -131.6][idx];
+              return (
+                <rect
+                  key={`pp-${tx}`}
+                  x={tx - 1.35}
+                  y={ty - 0.75}
+                  width={2.7}
+                  height={1.5}
+                  fill="#2563eb"
+                  stroke="#ffffff"
+                  strokeWidth="0.22"
+                />
+              );
+            })}
           </g>
         )}
 
