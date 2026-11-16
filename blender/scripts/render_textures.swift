@@ -906,19 +906,11 @@ do {
         drawFlippedText("火警 119", in: CGRect(x: r.minX + 12, y: r.minY + 84, width: r.width - 24, height: 28), fontName: "PingFangSC-Semibold", size: 20, color: .white, align: .center, bold: true)
     }
 
-    // Tile 6B: Classroom Doorplate "高二(3)班" (x: 808..904, y: 420..532)
+    // Tile 6B: Reserved neutral plaster swatch (no class doorplates per campus map rules)
     do {
         let r = CGRect(x: 808, y: 420, width: 96, height: 112)
-        ctx.setFillColor(rgb(0.93, 0.89, 0.76, 1.0))
+        ctx.setFillColor(rgb(0.92, 0.92, 0.93, 1.0))
         ctx.fill(r)
-        ctx.setStrokeColor(rgb(0.68, 0.58, 0.34, 1.0))
-        ctx.setLineWidth(3)
-        ctx.stroke(r.insetBy(dx: 4, dy: 4))
-        let crest = CGRect(x: r.midX - 11, y: r.minY + 10, width: 22, height: 22)
-        ctx.setFillColor(rgb(0.10, 0.32, 0.56, 1.0))
-        ctx.fillEllipse(in: crest)
-        drawFlippedText("高二(3)班", in: CGRect(x: r.minX + 6, y: r.minY + 38, width: r.width - 12, height: 42), fontName: "PingFangSC-Semibold", size: 15, color: NSColor(white: 0.15, alpha: 1.0), align: .center, bold: true)
-        drawFlippedText("P114", in: CGRect(x: r.minX + 6, y: r.minY + 82, width: r.width - 12, height: 20), fontName: "HelveticaNeue-Bold", size: 11, color: NSColor(white: 0.32, alpha: 1.0), align: .center)
     }
 
     // Tile 6C: Salmon-Pink Residential Accent Cladding (x: 912..1016, y: 420..532)

@@ -65,7 +65,6 @@ UV_GLASS_BACKBOARD: UVBox = (0.5898, 0.0117, 0.9883, 0.2461)
 UV_CRAZY_PAVING: UVBox = (0.3262, 0.2754, 0.5645, 0.5137)
 UV_WHITE_PEBBLES: UVBox = (0.5918, 0.2754, 0.7676, 0.5137)
 UV_FIRE_BOX: UVBox = (0.7930, 0.2734, 0.9883, 0.3984)
-UV_CLASS_SIGN: UVBox = (0.7930, 0.4141, 0.8789, 0.5156)
 UV_SALMON_WALL: UVBox = (0.8945, 0.4141, 0.9883, 0.5156)
 UV_HISTORY_GLASS_DOOR: UVBox = (0.3242, 0.5352, 0.6992, 0.7461)
 UV_LANE_NUMS: Tuple[UVBox, UVBox, UVBox, UVBox] = (
@@ -1343,12 +1342,14 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     gnd.add_polygon_patch(ways["352521262"]["pts"], 0.0, mats["surf"], UV_PLAZA_TILE, ao=0.95)
     # Surrounding road base (below y=0 slightly)
     gnd.add_box(mats["surf"], -35.0, 60.0, -0.18, 290.0, 270.0, 0.16, 0.0, UV_ASPHALT, ao_bot=0.92, ao_top=0.92)
-    # East entry driveway stone pavement leading north to Cafeteria (W-B6) + 同福夹道 alley strip
-    gnd.add_polygon_patch([(-4.5, 5.2), (3.6, 5.2), (3.6, 96.5), (-5.2, 96.5)], 0.02, mats["surf"], UV_PLAZA_TILE, ao=0.98)
+    # East entry driveway stone pavement leading to 1F bike portal (W-ST1) & Cafeteria (W-B6) + 同福夹道 alley strip
+    gnd.add_polygon_patch([(-4.5, 5.2), (3.6, 5.2), (3.6, 75.2), (-5.2, 75.2)], 0.02, mats["surf"], UV_PLAZA_TILE, ao=0.98)
+    gnd.add_polygon_patch([(-5.2, 87.3), (3.6, 87.3), (3.6, 96.5), (-5.2, 96.5)], 0.02, mats["surf"], UV_PLAZA_TILE, ao=0.98)
     gnd.add_polygon_patch([(-4.2, -55.0), (4.2, -55.0), (4.2, 5.2), (-4.2, 5.2)], -0.01, mats["surf"], UV_ASPHALT, ao=0.95)
-    # Stone-paved passage east of 校史馆 (W-H1) & narrow semi-open north alley (y=133.2..136.8)
-    gnd.add_polygon_patch([(-70.2, 124.6), (-65.0, 124.6), (-65.0, 136.8), (-70.2, 136.8)], 0.025, mats["surf"], UV_PLAZA_TILE, ao=0.96)
-    gnd.add_polygon_patch([(-93.6, 133.1), (-67.0, 133.1), (-67.0, 136.9), (-93.6, 136.9)], 0.028, mats["surf"], UV_PLAZA_TILE, ao=0.94)
+    # Stone-paved passage east of 校史馆 (W-H1), north alley & straight W-B5 south veranda walk
+    gnd.add_polygon_patch([(-70.2, 124.6), (-65.0, 124.6), (-65.0, 136.85), (-70.2, 136.85)], 0.025, mats["surf"], UV_PLAZA_TILE, ao=0.96)
+    gnd.add_polygon_patch([(-93.6, 133.1), (-70.0, 133.1), (-70.0, 136.85), (-93.6, 136.85)], 0.028, mats["surf"], UV_PLAZA_TILE, ao=0.94)
+    gnd.add_polygon_patch([(-70.2, 134.8), (-7.6, 134.8), (-7.6, 136.85), (-70.2, 136.85)], 0.027, mats["surf"], UV_PLAZA_TILE, ao=0.95)
     # Decorative crazy-paving stone medallion in north alley east entry (Photo 1 foreground)
     gnd.quad_enu(
         mats["details"],
@@ -1363,10 +1364,18 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         [(-89.8, 76.2), (-69.8, 77.2), (-69.5, 66.8), (-55.2, 66.8), (-55.2, 87.3), (-89.8, 87.3)],
         0.025, mats["surf"], UV_PLAZA_TILE, ao=0.96,
     )
-    # East side: 自行车停放区（无车棚） — dark grey brick paving + curb + painted parking stripes + parked bicycles (Photo 7)
+    # East side: 自行车停放区（无车棚） + 外置楼梯东侧一层推车穿堂连接道 (Photos 4 & 7)
     gnd.add_polygon_patch(
         [(-46.8, 68.2), (-37.5, 68.4), (-11.5, 84.5), (-11.5, 87.3), (-46.8, 87.3)],
         0.032, mats["details"], UV_DARK_SLATE_PODIUM, ao=0.92,
+    )
+    gnd.add_polygon_patch(
+        [(-11.5, 84.5), (-9.5, 83.2), (-0.45, 83.2), (-0.45, 87.3), (-11.5, 87.3)],
+        0.032, mats["details"], UV_DARK_SLATE_PODIUM, ao=0.92,
+    )
+    gnd.add_polygon_patch(
+        [(-0.45, 74.8), (3.35, 74.8), (3.35, 87.3), (-0.45, 87.3)],
+        0.032, mats["details"], UV_DARK_SLATE_PODIUM, ao=0.91,
     )
     # Low stone curb separating south bicycle plaza from track apron
     gnd.add_box(mats["surf"], -29.2, 87.32, 0.02, 35.4, 0.24, 0.11, 0.0, UV_PLAZA_TILE, ao_bot=0.80, ao_top=0.98)
@@ -1377,6 +1386,18 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         (-44.6, 78.2, -44.45, 85.54),
         (-29.5, 78.2, -29.35, 85.54),
         (-14.65, 78.2, -14.5, 85.54),
+        # Parking bay stripes north of W-ST1 & 1F push-bike lane guide lines through east portal
+        (-9.2, 83.55, -2.0, 83.67),
+        (-9.2, 83.55, -9.08, 85.15),
+        (-6.8, 83.55, -6.68, 85.15),
+        (-4.4, 83.55, -4.28, 85.15),
+        (-2.12, 83.55, -2.0, 85.15),
+        (-0.22, 74.9, -0.10, 85.4),
+        (3.00, 74.9, 3.12, 85.4),
+        (1.39, 75.7, 1.51, 77.3),
+        (1.39, 78.5, 1.51, 80.1),
+        (1.39, 81.3, 1.51, 82.9),
+        (-14.5, 85.4, 1.51, 85.52),
     ]:
         gnd.quad_enu(mats["white_alu"], (lx0, ly0, 0.042), (lx1, ly0, 0.042), (lx1, ly1, 0.042), (lx0, ly1, 0.042))
     # Two rows of open steel wheel racks + realistic parked student bicycles (strictly unroofed, Photo 7)
@@ -1388,8 +1409,11 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     add_parked_bicycle_row(gnd, -41.8, 79.85, 16, 1.62, 0.0, 0.28, mats)
     add_parked_bicycle_row(gnd, -41.2, 83.85, 15, 1.68, 0.0, -0.24, mats)
 
-    # North-east rockery & ping-pong plaza east of Chairman Stage (Photo 5)
-    gnd.add_polygon_patch([(-32.8, 124.6), (-9.5, 124.6), (-9.5, 134.8), (-32.8, 134.8)], 0.026, mats["surf"], UV_PLAZA_TILE, ao=0.96)
+    # North-east rockery & ping-pong plaza east of Chairman Stage (closed cleanly inside NE boundary wall)
+    gnd.add_polygon_patch(
+        [(-32.8, 124.6), (-6.0, 124.6), (-6.0, 127.5), (-7.6, 134.9), (-32.8, 134.9)],
+        0.026, mats["surf"], UV_PLAZA_TILE, ao=0.96,
+    )
     add_taihu_rockery_basin(gnd, -26.0, 129.8, mats)
     for ppx, ppy, ppyaw in [(-30.0, 128.4, 0.0), (-21.6, 128.8, 0.0), (-16.8, 129.0, 0.0), (-22.0, 131.6, 0.0)]:
         add_pingpong_table(gnd, ppx, ppy, ppyaw, mats)
@@ -1413,6 +1437,8 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         a, b = bound[i], bound[(i + 1) % len(bound)]
         if a[1] < 8.0 and b[1] < 8.0 and -11.5 <= a[0] <= 5.0 and -11.5 <= b[0] <= 5.0:
             continue  # Open for West Gate & Guardhouse facade
+        if min(a[1], b[1]) >= 96.4 and max(a[1], b[1]) <= 127.6 and min(a[0], b[0]) >= -5.7:
+            continue  # W-B6 Cafeteria exterior walls form the campus boundary here
         dx, dy = b[0] - a[0], b[1] - a[1]
         L = math.hypot(dx, dy)
         if L < 0.5:
@@ -1886,11 +1912,66 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
                 lx = -9.12 + li * 0.58
                 wst1.add_box(mats["blue_steel"], lx, 80.5 + by_o, z0, 0.045, 0.04, 3.55, 0.0)
     wst1.add_box(mats["white_alu"], -6.8, 80.5, 19.35, 5.3, 5.3, 0.30, 0.0)
-    # North-facing "尚美 · 美育浮雕" wall + twin spotlight post (west-stairway-2024.webp)
-    wst1.add_box(mats["surf"], -6.65, 83.52, 0.0, 6.1, 0.34, 3.35, 0.0, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.95)
-    wst1.quad_enu(mats["stage"], (-3.8, 83.72, 0.42), (-9.5, 83.72, 0.42), (-9.5, 83.72, 3.12), (-3.8, 83.72, 3.12), UV_RELIEF_WALL, 0.90, 1.0)
-    wst1.add_cylinder(mats["blue_steel"], -8.6, 84.3, 0.0, 0.07, 0.06, 2.85, 8)
-    wst1.add_box(mats["white_alu"], -8.6, 84.3, 2.75, 0.68, 0.16, 0.18, 0.0)
+    # Twin spotlight post in front of W-ST1 north plinth (west-stairway-2024.webp)
+    wst1.add_cylinder(mats["blue_steel"], -7.8, 83.68, 0.0, 0.07, 0.06, 2.85, 8)
+    wst1.add_box(mats["white_alu"], -7.8, 83.68, 2.75, 0.68, 0.16, 0.18, 0.0)
+
+    # 1-Story Covered Bike Pass-Through Building east of W-ST1 (spanning to East Campus Wall, y=75.20..83.40)
+    # West enclosed Qingzhuan bay (tying cleanly into B座 east gable & W-ST1 east plinth)
+    west_room_pts = [
+        (-6.97, 75.20), (-0.45, 75.20), (-0.45, 83.40),
+        (-4.08, 83.40), (-4.08, 77.78), (-8.22, 77.78),
+    ]
+    wst1.add_polygon_slab(
+        west_room_pts, 0.0, 3.44,
+        mats["surf"], mats["surf"],
+        UV_QINGZHUAN, UV_PLAZA_TILE,
+        ao_bot=0.75, ao_top=0.94,
+    )
+    # South-facing glazed duty/service window on west bay
+    wst1.add_box(mats["dark_steel"], -3.70, 75.18, 1.15, 2.80, 0.10, 1.50, 0.0, ao_bot=0.78, ao_top=0.94)
+    wst1.add_box(mats["surf"], -3.70, 75.14, 1.07, 2.96, 0.16, 0.08, 0.0, UV_PLAZA_TILE)
+    wst1.quad_enu(
+        mats["glass"],
+        (-5.02, 75.12, 1.22), (-2.38, 75.12, 1.22),
+        (-2.38, 75.12, 2.58), (-5.02, 75.12, 2.58),
+        UV_GLASS_WINDOW, 0.88, 0.98,
+    )
+    wst1.add_box(mats["white_alu"], -3.70, 75.12, 1.20, 0.06, 0.05, 1.40, 0.0)
+    # North-facing "尚美 · 美育浮雕" bronze relief on west bay north wall (west-stairway-2024.webp left!)
+    wst1.add_box(mats["dark_steel"], -2.275, 83.42, 0.46, 3.35, 0.06, 2.58, 0.0)
+    wst1.quad_enu(
+        mats["stage"],
+        (-0.65, 83.46, 0.52), (-3.90, 83.46, 0.52),
+        (-3.90, 83.46, 2.98), (-0.65, 83.46, 2.98),
+        UV_RELIEF_WALL, 0.92, 1.0,
+    )
+    # East Qingzhuan structural pier along East Campus Wall & hollow 1F bike tunnel (x = -0.45..+3.35, h = 3.02m)
+    wst1.add_box(mats["surf"], 3.65, 79.30, 0.0, 0.60, 8.20, 3.44, 0.0, UV_QINGZHUAN, ao_bot=0.74, ao_top=0.94)
+    wst1.add_box(mats["surf"], 1.45, 79.30, 3.02, 3.84, 8.20, 0.42, 0.0, UV_QINGZHUAN, ao_bot=0.84, ao_top=0.95)
+    # Bright white ceiling soffit, light stucco upper tunnel walls & warm ceiling dome lights inside 1F passage
+    wst1.add_box(mats["surf"], -0.43, 79.30, 1.05, 0.04, 8.08, 1.96, 0.0, UV_STUCCO, ao_bot=0.88, ao_top=0.96)
+    wst1.add_box(mats["surf"], 3.33, 79.30, 1.05, 0.04, 8.08, 1.96, 0.0, UV_STUCCO, ao_bot=0.88, ao_top=0.96)
+    wst1.add_box(mats["white_alu"], 1.45, 79.30, 2.99, 3.78, 8.12, 0.04, 0.0, ao_bot=0.92, ao_top=0.98)
+    for cly in (77.3, 81.3):
+        wst1.add_cylinder(mats["floodlight"], 1.45, cly, 2.94, 0.24, 0.24, 0.05, 12, ao_bot=0.98, ao_top=1.0)
+    # Crisp white portal jambs & lintel frames on both South entrance (y=75.18) and North exit (y=83.42)
+    for py_port in (75.18, 83.42):
+        wst1.add_box(mats["white_alu"], -0.52, py_port, 0.03, 0.16, 0.14, 3.08, 0.0, ao_bot=0.82, ao_top=0.98)
+        wst1.add_box(mats["white_alu"], 3.42, py_port, 0.03, 0.16, 0.14, 3.08, 0.0, ao_bot=0.82, ao_top=0.98)
+        wst1.add_box(mats["white_alu"], 1.45, py_port, 2.97, 4.10, 0.16, 0.16, 0.0, ao_bot=0.88, ao_top=1.0)
+    # Continuous 1-story flat roof & overhanging white moulded cornice (z = 3.44..3.66m)
+    pass_roof_pts = [
+        (-7.05, 75.06), (4.06, 75.06), (4.06, 83.54),
+        (-4.06, 83.54), (-4.06, 77.74), (-8.30, 77.74),
+    ]
+    wst1.add_polygon_slab(
+        pass_roof_pts, 3.44, 3.66,
+        mats["white_alu"], mats["surf"],
+        (0.1, 0.1, 0.9, 0.9), UV_PLAZA_TILE,
+        ao_bot=0.90, ao_top=0.98,
+    )
+    wst1.add_polygon_patch(pass_roof_pts, 3.664, mats["surf"], UV_PLAZA_TILE, ao=0.98)
 
     # ---- W-MC: 音乐长廊（始于音乐长廊牌楼 y≈81.5，沿 C 座西侧向南延伸；操场西侧不设棚廊） ----
     wmc = exp.add_node("W-MC")
@@ -2236,57 +2317,34 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     wp2.add_cylinder(mats["gold_trim"], fx, fy, 14.98, 0.11, 0.03, 0.16, 10)
     wp2.quad_enu(mats["gates"], (fx + 0.05, fy, 13.15), (fx + 2.45, fy - 0.22, 13.15), (fx + 2.45, fy - 0.22, 14.75), (fx + 0.05, fy, 14.75), UV_FLAG, 0.96, 1.0, double_sided=True)
 
-    # ---- W-B5: 高二平房区（主翼含南向挑檐廊柱 + 西延教室段 高二(3)班, Photos 1 & 5） ----
+    # ---- W-B5: 高二平房区（北界通长直线1层教学平房 + 南向连续方柱挑檐外廊） ----
     wb5 = exp.add_node("W-B5")
-    # Main east-central wing (x = -67.2..-11.2, y = 134.8..141.9) + south pillared veranda overhang (y = 133.2..134.8)
-    wb5_main_pts = [(-67.2, 134.8), (-11.2, 134.8), (-11.2, 141.9), (-67.2, 141.9)]
+    wb5_pts = [(-92.2, 136.8), (-7.8, 136.8), (-7.8, 142.1), (-92.2, 142.1)]
     wb5.add_detailed_building(
-        wb5_main_pts, stories=1, story_h=3.15, plinth_h=0.50,
+        wb5_pts, stories=1, story_h=3.15, plinth_h=0.50,
         wall_mat=mats["surf"], wall_uv=UV_STUCCO,
         band_mat=mats["surf"], band_uv=UV_QINGZHUAN,
         roof_mat=mats["surf"], roof_uv=UV_PLAZA_TILE,
         win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
         mullion_mat=mats["dark_steel"],
         plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
-        parapet_h=0.45, add_rail=False, bay_w=3.5,
-        solid_x_planes=[-67.2],
+        parapet_h=0.45, add_rail=False, bay_w=3.6,
+        solid_x_planes=[-7.8],
     )
-    # Protruding flat veranda canopy & colonnade columns along south facade (Photo 5 & west-stage-2026.webp!)
-    wb5.add_box(mats["surf"], -39.2, 133.95, 3.25, 56.2, 1.75, 0.55, 0.0, UV_STUCCO, ao_bot=0.84, ao_top=0.98, top_mat=mats["surf"], top_uv=UV_PLAZA_TILE)
-    wb5.add_box(mats["wall_grey_render"], -39.2, 133.82, 3.76, 56.4, 2.02, 0.14, 0.0, ao_bot=0.88, ao_top=1.0)
-    for col_i in range(15):
-        vc_x = -66.8 + col_i * 3.95
-        wb5.add_box(mats["surf"], vc_x, 133.28, 0.0, 0.34, 0.34, 3.25, 0.0, UV_STUCCO, ao_bot=0.76, ao_top=0.94)
-    # West classroom extension north of 校史馆 W-H1 (x = -92.2..-67.2, y = 136.8..142.1, Photo 1 right side!)
-    wb5_west_pts = [(-92.2, 136.8), (-67.2, 136.8), (-67.2, 142.1), (-92.2, 142.1)]
-    wb5.add_detailed_building(
-        wb5_west_pts, stories=1, story_h=3.05, plinth_h=0.48,
-        wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN,
-        band_mat=mats["surf"], band_uv=UV_QINGZHUAN,
-        roof_mat=mats["surf"], roof_uv=UV_PLAZA_TILE,
-        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
-        mullion_mat=mats["dark_steel"],
-        plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
-        parapet_h=0.38, add_rail=False, bay_w=3.6,
-        solid_x_planes=[-67.2],
-    )
-    # White overhanging corridor ceiling soffit + warm round ceiling light + "高二(3)班" doorplate & red fire box (Photo 1 right!)
-    wb5.add_box(mats["white_alu"], -69.5, 135.95, 3.06, 4.70, 1.72, 0.24, 0.0, ao_bot=0.90, ao_top=0.99, top_mat=mats["surf"], top_uv=UV_PLAZA_TILE)
-    wb5.add_cylinder(mats["floodlight"], -69.8, 135.78, 3.01, 0.22, 0.22, 0.05, 12, ao_bot=0.98, ao_top=1.0)
-    # Grey-brick jutting wing wall on north side of alley + classroom door & "高二(3)班" plaque
-    wb5.add_box(mats["surf"], -72.05, 136.02, 0.0, 1.05, 1.56, 3.08, 0.0, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.94)
+    # Continuous straight south pillared veranda overhang from W-H1 north alley portal (x=-72.52) to east wall (x=-7.8)
+    wb5.add_box(mats["surf"], -40.29, 135.96, 3.25, 65.08, 1.72, 0.52, 0.0, UV_STUCCO, ao_bot=0.84, ao_top=0.98, top_mat=mats["surf"], top_uv=UV_PLAZA_TILE)
+    wb5.add_box(mats["wall_grey_render"], -40.29, 135.88, 3.74, 65.20, 1.92, 0.14, 0.0, ao_bot=0.88, ao_top=1.0)
+    for col_i in range(18):
+        vc_x = -72.52 + col_i * 3.79
+        col_h = 2.72 if col_i == 0 else 3.25
+        wb5.add_box(mats["surf"], vc_x, 135.28, 0.0, 0.34, 0.34, col_h, 0.0, UV_STUCCO, ao_bot=0.76, ao_top=0.94)
+    # Warm round ceiling light under west veranda bay + flush red fire extinguisher cabinet on straight south wall
+    wb5.add_cylinder(mats["floodlight"], -69.8, 135.95, 3.20, 0.22, 0.22, 0.05, 12, ao_bot=0.98, ao_top=1.0)
+    wb5.add_box(mats["crimson"], -71.50, 136.66, 0.03, 0.72, 0.24, 0.62, 0.0, ao_bot=0.78, ao_top=0.96)
     wb5.quad_enu(
         mats["details"],
-        (-71.49, 136.42, 1.72), (-71.49, 136.68, 1.72),
-        (-71.49, 136.68, 2.08), (-71.49, 136.42, 2.08),
-        UV_CLASS_SIGN, 0.95, 1.0,
-    )
-    # Red fire extinguisher box ("灭火器箱 火警 119") at right pier base facing alley (Photo 1 bottom-right!)
-    wb5.add_box(mats["crimson"], -71.92, 135.14, 0.03, 0.72, 0.24, 0.62, 0.0, ao_bot=0.78, ao_top=0.96)
-    wb5.quad_enu(
-        mats["details"],
-        (-72.26, 135.01, 0.05), (-71.58, 135.01, 0.05),
-        (-71.58, 135.01, 0.63), (-72.26, 135.01, 0.63),
+        (-71.84, 136.53, 0.05), (-71.16, 136.53, 0.05),
+        (-71.16, 136.53, 0.63), (-71.84, 136.53, 0.63),
         UV_FIRE_BOX, 0.94, 1.0,
     )
 
@@ -2544,14 +2602,14 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     # 3. NE External Hutong Courtyard Cluster (way 636389213 + front 1F grey-brick gable + east red-tile roofs, Photos 4 & 5!)
     # Front 1-story Qingzhuan pitched-gable courtyard house immediately outside NE boundary (Photo 5 right foreground!)
     ctx_w.add_pitched_gable_building(
-        cx=-2.4, cy_n=135.4, w=13.2, d=5.6, eave_h=3.45, ridge_h=1.55, yaw_rad=0.0,
+        cx=-0.2, cy_n=135.4, w=13.2, d=5.6, eave_h=3.45, ridge_h=1.55, yaw_rad=0.0,
         wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN,
         roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
         win_mat=mats["warm_glass"], win_uv=(0.0, 0.0, 1.0, 1.0),
         wood_mat=mats["white_alu"], stories=1, ridge_along_x=True,
     )
-    ctx_w.add_box(mats["surf"], 5.8, 133.2, 0.0, 6.2, 4.4, 3.35, 0.0, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.94, top_mat=mats["surf"], top_uv=UV_GREY_TILE)
-    ctx_w.quad_enu(mats["warm_glass"], (2.68, 134.8, 0.9), (2.68, 131.6, 0.9), (2.68, 131.6, 2.7), (2.68, 134.8, 2.7), (0.0, 0.0, 1.0, 1.0))
+    ctx_w.add_box(mats["surf"], 7.2, 133.2, 0.0, 6.2, 4.4, 3.35, 0.0, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.94, top_mat=mats["surf"], top_uv=UV_GREY_TILE)
+    ctx_w.quad_enu(mats["warm_glass"], (4.08, 134.8, 0.9), (4.08, 131.6, 0.9), (4.08, 131.6, 2.7), (4.08, 134.8, 2.7), (0.0, 0.0, 1.0, 1.0))
     # Rear 2-story Qingzhuan pitched-gable building (way 636389213, Photo 5 right background!)
     ctx_w.add_pitched_gable_building(
         cx=2.1, cy_n=142.4, w=18.6, d=6.8, eave_h=6.85, ridge_h=1.85, yaw_rad=0.03,
@@ -2660,7 +2718,7 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     for tx, ty, sp, th in [
         (-22, 52, "broad", 8.5), (-35, 51, "broad", 8.0), (-9.2, 25.6, "broad", 7.2),
         (1.0, 26, "broad", 7.8), (1.0, 44, "broad", 7.8), (-89.5, 134.8, "broad", 7.8),
-        (-102.0, 92.0, "broad", 9.5), (-118.0, 90.0, "broad", 10.2), (-6.2, 130.2, "broad", 9.6),
+        (-102.0, 92.0, "broad", 9.5), (-118.0, 90.0, "broad", 10.2), (-2.5, 130.4, "broad", 9.6),
     ]:
         ctx_w.add_tree(tx, ty, sp, th, mats["trunk"], mats["leaf"])
 
