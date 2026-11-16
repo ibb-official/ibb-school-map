@@ -545,6 +545,14 @@ export function CampusMap2D({
             <circle cx={-75.05} cy={-134.55} r={1.15} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
             <circle cx={-19.6} cy={-124.52} r={1.25} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
             <circle cx={-26.0} cy={-129.8} r={2.2} fill="rgba(100,116,139,0.38)" stroke="#475569" strokeWidth="0.45" />
+            {/* 1F Bike Push-Through Passage (W-ST1 East Portal -> Bicycle Parking Zone) */}
+            <path
+              d="M 1.45,-73.8 L 1.45,-85.4 L -13.2,-85.4"
+              stroke="#0f766e"
+              strokeWidth="0.55"
+              strokeDasharray="1.3 0.9"
+            />
+            <polygon points="-14.4,-85.4 -12.7,-86.2 -12.7,-84.6" fill="#0f766e" stroke="none" />
             {[-30.0, -21.6, -16.8, -22.0].map((tx, idx) => {
               const ty = [-128.4, -128.8, -129.0, -131.6][idx];
               return (

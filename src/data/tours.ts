@@ -52,10 +52,10 @@ export const CAMERA_TOURS: CameraTourStop[] = [
     id: "tour-w-h1-alley",
     campusId: "west",
     title: "校史馆北穿树门厅",
-    subtitle: "人视步入校史馆北侧内巷：高二西延教室、青砖门洞、白卵石穿顶古树与玻璃门厅",
+    subtitle: "人视步入校史馆北侧内巷：高二平房南向通廊、青砖门洞、白卵石穿顶古树与玻璃门厅",
     lightingSuggestion: "morning",
-    cameraPos: [-68.2, 1.75, -134.25],
-    cameraTarget: [-77.0, 1.85, -134.35],
+    cameraPos: [-68.2, 1.75, -134.35],
+    cameraTarget: [-77.0, 1.85, -134.45],
   },
 
   // EAST CAMPUS TOURS
