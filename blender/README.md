@@ -11,7 +11,7 @@ blender/
 │   ├── west_metric.json               # 西校区 OSM / 实测米制 ENU 多边形真源
 │   └── east_metric.json               # 东校区 OSM / 实测米制 ENU 多边形真源
 └── scripts/
-    ├── render_textures.swift          # (macOS CoreGraphics) 生成校园招牌/砖纹/跑道图集 PNG
+    ├── render_textures.swift          # (macOS CoreGraphics) 生成校园招牌/砖纹/跑道/精细小品 4 张图集 PNG
     ├── generate_campus_glb.py         # 纯 Python glTF 2.0 (.glb) 精细生成器（无须安装 Blender）
     └── build_in_blender.py            # Blender 4.x (`bpy`) 原生装配与 glTF 导出脚本
 ```

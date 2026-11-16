@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tex-dir",
         default=os.environ.get("MAP_TEX_DIR", ""),
-        help="Optional directory with tex_signage_gates.png / tex_plaques_stage.png / tex_surfaces.png",
+        help="Optional directory with tex_signage_gates.png / tex_plaques_stage.png / tex_surfaces.png / tex_west_details.png",
     )
     return parser.parse_args(argv)
 
@@ -224,12 +224,17 @@ def build_west_scene(west_json: dict, mats: Dict[str, bpy.types.Material], root_
     add_box("W-L1", -6.6, 70.0, 0.0, 1.8, 1.0, 3.52, mats["qingzhuan"], root_col, bevel_width=0.05)
     add_box("W-L3", -16.5, 58.8, 0.0, 1.3, 1.3, 2.55, mats["bronze"], root_col, bevel_width=0.04)
 
-    # Central teaching complex: C座 (W-B1, 6F taller) + 楼梯间 (W-B2, 6F) + B座 (W-B3, 6F NE inflection)
-    wb1_pts = [(-89.8, 76.2), (-55.2, 76.8), (-55.2, 58.0), (-68.2, 58.0), (-68.2, 34.2), (-79.9, 34.0), (-81.0, 49.8), (-87.8, 53.5)]
-    wb2_pts = [(-55.2, 76.8), (-41.5, 76.8), (-41.5, 57.5), (-55.2, 58.0)]
-    wb3_pts = [(-41.5, 70.0), (-11.5, 84.5), (-5.8, 72.8), (-35.5, 57.5), (-41.5, 57.5)]
+    # Central teaching complex: C座 (W-B1, 6F taller) + 楼梯间 (W-B2, 6F 90° north projection) + B座 (W-B3, 6F obtuse bend)
+    wb1_pts = [
+        (-89.8, 76.2), (-69.8, 77.2), (-69.5, 66.8), (-55.2, 66.8),
+        (-55.2, 58.0), (-68.2, 58.0), (-68.2, 34.2), (-79.9, 34.0),
+        (-81.0, 49.8), (-87.8, 53.5),
+    ]
+    wb2_pts = [(-55.2, 77.1), (-46.8, 77.4), (-46.8, 57.6), (-55.2, 58.0)]
+    wb3_pts = [(-46.8, 68.2), (-37.5, 68.4), (-11.5, 84.5), (-5.8, 72.8), (-35.5, 57.5), (-46.8, 57.6)]
+    wb5_pts = [(-92.2, 136.8), (-67.2, 136.8), (-67.2, 133.3), (-11.2, 133.3), (-11.2, 141.9), (-92.2, 142.1)]
     add_extruded_polygon("W-B1", wb1_pts, 0.0, 23.65, mats["stucco"], root_col, 0.04)
-    add_extruded_polygon("W-B2", wb2_pts, 0.0, 21.50, mats["stucco"], root_col, 0.04)
+    add_extruded_polygon("W-B2", wb2_pts, 0.0, 22.40, mats["stucco"], root_col, 0.04)
     add_extruded_polygon("W-B3", wb3_pts, 0.0, 21.50, mats["stucco"], root_col, 0.04)
     add_box("W-R1", -32.0, 44.5, 0.0, 35.0, 4.6, 4.35, mats["white_alu"], root_col, bevel_width=0.04)
 
@@ -239,7 +244,7 @@ def build_west_scene(west_json: dict, mats: Dict[str, bpy.types.Material], root_
     add_box("W-L2", -56.4, 48.0, 0.0, 18.0, 12.0, 0.12, mats["ground"], root_col, bevel_width=0.02)
     add_box("W-P1", -48.8, 106.0, 0.0, 81.5, 37.0, 0.14, mats["track"], root_col, bevel_width=0.0)
     add_box("W-P2", -44.0, 129.0, 0.0, 22.0, 6.0, 5.1, mats["tensile"], root_col, bevel_width=0.04)
-    add_box("W-B5", -39.0, 137.8, 0.0, 52.0, 8.0, 3.8, mats["qingzhuan"], root_col, bevel_width=0.04)
+    add_extruded_polygon("W-B5", wb5_pts, 0.0, 3.8, mats["qingzhuan"], root_col, 0.04)
     add_box("W-H1", -81.0, 129.0, 0.0, 22.0, 8.4, 8.8, mats["qingzhuan"], root_col, bevel_width=0.04)
     add_box("W-B6", 0.2, 112.0, 0.0, 11.6, 31.0, 6.35, mats["roof_red"], root_col, bevel_width=0.04)
     add_box("Context_West", -130.0, 120.0, 0.0, 68.0, 34.0, 12.0, mats["context"], root_col, bevel_width=0.0)
