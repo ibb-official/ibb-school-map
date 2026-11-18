@@ -1021,6 +1021,13 @@ def init_materials(exp: GLBExporter, tex_dir: str, include_west_details: bool = 
         )
         mats["wall_grey_render"] = exp.add_mat("Mat_WallGreyRender", base_color=(0.66, 0.68, 0.71, 1.0), roughness=0.88)
         mats["context_dark"] = exp.add_mat("Mat_ContextDark", base_color=(0.32, 0.35, 0.40, 1.0), roughness=0.78)
+    mats["led_off"] = exp.add_mat("Mat_LEDOff", base_color=(0.13, 0.14, 0.15, 1.0), metallic=0.10, roughness=0.30, emissive=(0.03, 0.03, 0.035))
+    mats["stainless"] = exp.add_mat("Mat_Stainless", base_color=(0.80, 0.81, 0.82, 1.0), metallic=0.85, roughness=0.25)
+    mats["bare_soil"] = exp.add_mat("Mat_BareSoil", base_color=(0.46, 0.40, 0.32, 1.0), roughness=1.0)
+    mats["fence_mesh"] = exp.add_mat("Mat_FenceMesh", base_color=(0.55, 0.58, 0.60, 0.30), roughness=0.55, double_sided=True, alpha_mode="BLEND")
+    mats["sign_red"] = exp.add_mat("Mat_SignRed", base_color=(0.62, 0.12, 0.12, 1.0), roughness=0.60)
+    mats["sign_blue"] = exp.add_mat("Mat_SignBlue", base_color=(0.10, 0.30, 0.55, 1.0), roughness=0.55)
+    mats["plaque_white"] = exp.add_mat("Mat_PlaqueWhite", base_color=(0.92, 0.92, 0.89, 1.0), roughness=0.45)
     return mats
 
 
@@ -2835,107 +2842,310 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
 # ---------------------------------------------------------------------------
 # EAST CAMPUS (东四六条甲44号 毕业年级校区)
 # ---------------------------------------------------------------------------
+def add_grid_patch(nb: NodeBuilder, x0: float, y0: float, x1: float, y1: float, z: float,
+                   mat: int, uv: UVBox, cell: float = 2.0, ao: float = 1.0) -> None:
+    """Axis-aligned paving patch with a 1:1 texture tile per grid cell (no long stretch)."""
+    u0, v0, u1, v1 = uv
+    nx = max(1, int(math.ceil((x1 - x0) / cell)))
+    ny = max(1, int(math.ceil((y1 - y0) / cell)))
+    dx = (x1 - x0) / nx
+    dy = (y1 - y0) / ny
+    for ix in range(nx):
+        for iy in range(ny):
+            ax = x0 + ix * dx
+            ay = y0 + iy * dy
+            nb.quad_enu(
+                mat,
+                (ax, ay, z), (ax + dx, ay, z), (ax + dx, ay + dy, z), (ax, ay + dy, z),
+                (u0, v0, u1, v1), ao, ao,
+            )
+
+
+def add_wall_run(nb: NodeBuilder, a: Vec2, b: Vec2, h: float, thick: float,
+                 mat: int, uv: UVBox, cap_mat: Optional[int] = None, cap_uv: Optional[UVBox] = None) -> None:
+    """Wall segment with an optional tiled coping cap."""
+    L = math.hypot(b[0] - a[0], b[1] - a[1])
+    if L < 0.05:
+        return
+    yaw = math.atan2(b[1] - a[1], b[0] - a[0])
+    cx = (a[0] + b[0]) * 0.5
+    cy = (a[1] + b[1]) * 0.5
+    nb.add_box(mat, cx, cy, 0.0, L, thick, h, yaw, uv, ao_bot=0.78, ao_top=0.97)
+    if cap_mat is not None:
+        nb.add_box(cap_mat, cx, cy, h, L + 0.10, thick + 0.16, 0.10, yaw, cap_uv or uv)
+
+
+def add_ribbon(nb: NodeBuilder, mat: int, p0: Vec3, p1: Vec3, width: float,
+               uv: UVBox = (0.0, 0.0, 1.0, 1.0), ao: float = 1.0) -> None:
+    """Flat double-sided bar in a vertical plane (for X-braces / A-frame legs)."""
+    x0, y0, z0 = p0
+    x1, y1, z1 = p1
+    dx, dz = x1 - x0, z1 - z0
+    L = math.hypot(dx, dz) or 1.0
+    nx, nz = -dz / L * width * 0.5, dx / L * width * 0.5
+    nb.quad_enu(
+        mat,
+        (x0 + nx, y0, z0 + nz), (x0 - nx, y0, z0 - nz),
+        (x1 - nx, y1, z1 - nz), (x1 + nx, y1, z1 + nz),
+        uv, ao, ao, double_sided=True,
+    )
+
+
+def add_ground_line(nb: NodeBuilder, mat: int, x0: float, y0: float, x1: float, y1: float,
+                    width: float, z: float) -> None:
+    L = math.hypot(x1 - x0, y1 - y0)
+    if L < 0.02:
+        return
+    nb.add_box(mat, (x0 + x1) * 0.5, (y0 + y1) * 0.5, z, L, width, 0.02,
+               math.atan2(y1 - y0, x1 - x0))
+
+
+def add_ground_circle(nb: NodeBuilder, mat: int, cx: float, cy: float, r: float,
+                      width: float, z: float, segs: int = 16,
+                      a0: float = 0.0, a1: float = math.pi * 2.0) -> None:
+    prev: Optional[Vec2] = None
+    for i in range(segs + 1):
+        a = a0 + (a1 - a0) * i / segs
+        p = (cx + r * math.cos(a), cy + r * math.sin(a))
+        if prev is not None:
+            add_ground_line(nb, mat, prev[0], prev[1], p[0], p[1], width, z)
+        prev = p
+
+
+def add_hutong_house(nb: NodeBuilder, cx: float, cy: float, w: float, d: float, h: float,
+                     yaw: float, wall_mat: int, wall_uv: UVBox, roof_mat: int, roof_uv: UVBox,
+                     ridge: float = 1.3, ridge_along_x: bool = True) -> None:
+    """Cheap gable hutong house (walls + two roof slopes + gable ends)."""
+    cs, sn = math.cos(yaw), math.sin(yaw)
+
+    def wp(lx: float, ly: float, lz: float) -> Vec3:
+        return (cx + lx * cs - ly * sn, cy + lx * sn + ly * cs, lz)
+
+    nb.add_box(wall_mat, cx, cy, 0.0, w, d, h, yaw, wall_uv, ao_bot=0.76, ao_top=0.95)
+    ov = 0.45
+    rh = h + ridge
+    if ridge_along_x:
+        nb.quad_enu(roof_mat, wp(-w / 2 - ov, -d / 2 - ov, h - 0.08), wp(w / 2 + ov, -d / 2 - ov, h - 0.08),
+                    wp(w / 2 + ov, 0, rh), wp(-w / 2 - ov, 0, rh), roof_uv, 0.88, 1.0, double_sided=True)
+        nb.quad_enu(roof_mat, wp(w / 2 + ov, d / 2 + ov, h - 0.08), wp(-w / 2 - ov, d / 2 + ov, h - 0.08),
+                    wp(-w / 2 - ov, 0, rh), wp(w / 2 + ov, 0, rh), roof_uv, 0.88, 1.0, double_sided=True)
+        nb.tri_enu(wall_mat, wp(-w / 2, d / 2, h), wp(-w / 2, -d / 2, h), wp(-w / 2, 0, rh),
+                   (0.05, 0.95), (0.95, 0.95), (0.5, 0.05), 0.85, 0.85, 0.95)
+        nb.tri_enu(wall_mat, wp(w / 2, -d / 2, h), wp(w / 2, d / 2, h), wp(w / 2, 0, rh),
+                   (0.05, 0.95), (0.95, 0.95), (0.5, 0.05), 0.85, 0.85, 0.95)
+    else:
+        nb.quad_enu(roof_mat, wp(-w / 2 - ov, d / 2 + ov, h - 0.08), wp(-w / 2 - ov, -d / 2 - ov, h - 0.08),
+                    wp(0, -d / 2 - ov, rh), wp(0, d / 2 + ov, rh), roof_uv, 0.88, 1.0, double_sided=True)
+        nb.quad_enu(roof_mat, wp(w / 2 + ov, -d / 2 - ov, h - 0.08), wp(w / 2 + ov, d / 2 + ov, h - 0.08),
+                    wp(0, d / 2 + ov, rh), wp(0, -d / 2 - ov, rh), roof_uv, 0.88, 1.0, double_sided=True)
+        nb.tri_enu(wall_mat, wp(-w / 2, -d / 2, h), wp(w / 2, -d / 2, h), wp(0, -d / 2, rh),
+                   (0.05, 0.95), (0.95, 0.95), (0.5, 0.05), 0.85, 0.85, 0.95)
+        nb.tri_enu(wall_mat, wp(w / 2, d / 2, h), wp(-w / 2, d / 2, h), wp(0, d / 2, rh),
+                   (0.05, 0.95), (0.95, 0.95), (0.5, 0.05), 0.85, 0.85, 0.95)
+
+
+def add_court_markings(nb: NodeBuilder, cx: float, cy: float, w: float, l: float,
+                       mat: int, z: float = 0.09) -> None:
+    """White FIBA-style markings scaled to the measured court (w x l)."""
+    t = 0.06
+    hw, hl = w * 0.5 - 0.18, l * 0.5 - 0.18
+    add_ground_line(nb, mat, cx - hw, cy - hl, cx + hw, cy - hl, t, z)
+    add_ground_line(nb, mat, cx + hw, cy - hl, cx + hw, cy + hl, t, z)
+    add_ground_line(nb, mat, cx + hw, cy + hl, cx - hw, cy + hl, t, z)
+    add_ground_line(nb, mat, cx - hw, cy + hl, cx - hw, cy - hl, t, z)
+    add_ground_line(nb, mat, cx - hw, cy, cx + hw, cy, t, z)
+    add_ground_circle(nb, mat, cx, cy, 1.75, t, z, 16)
+    for sgn in (-1.0, 1.0):
+        base = cy + sgn * hl
+        lane_end = base - sgn * 5.8
+        add_ground_line(nb, mat, cx - 2.45, base, cx - 2.45, lane_end, t, z)
+        add_ground_line(nb, mat, cx + 2.45, base, cx + 2.45, lane_end, t, z)
+        add_ground_line(nb, mat, cx - 2.45, lane_end, cx + 2.45, lane_end, t, z)
+        add_ground_circle(nb, mat, cx, lane_end, 1.75, t, z, 14)
+        hoop = base - sgn * 1.35
+        add_ground_circle(nb, mat, cx, hoop, 6.55, t, z, 18,
+                          a0=(math.pi * 0.5 - 1.12) if sgn > 0 else (-math.pi * 0.5 - 1.12),
+                          a1=(math.pi * 0.5 + 1.12) if sgn > 0 else (-math.pi * 0.5 + 1.12))
+
+
 def build_east_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, int]:
     east = json.loads(Path(data_path).read_text())
     ways = {w["id"]: w for w in east["ways"]}
     exp = GLBExporter()
-    mats = init_materials(exp, tex_dir)
+    mats = init_materials(exp, tex_dir, include_west_details=True)
 
-    # ---- Campus_Ground_East ----
+    # --- Layout constants (metres, ENU) : read from the measured truth block -
+    d = east.get("derived", {})
+    lane_cfg = d.get("north_lane", {})
+    gate_cfg = d.get("gate", {})
+    GX = float(gate_cfg.get("center_x", -6.55))     # gate centre line
+    OPEN = float(gate_cfg.get("opening", 4.80))     # clear opening between piers
+    PIER = float(gate_cfg.get("pier", 0.85))        # pier section
+    GATE_Y = 80.50                                   # gate plane (street line)
+    LANE_W = float(lane_cfg.get("w", -9.40))
+    LANE_E = float(lane_cfg.get("e", -3.30))
+    WALL_H = 2.60
+    WEST_PIER = GX - OPEN * 0.5 - PIER * 0.5
+    EAST_PIER = GX + OPEN * 0.5 + PIER * 0.5
+
+    # ---- Campus_Ground_East : real boundary + lane + street ----------------
     gnd = exp.add_node("Campus_Ground_East")
     gnd.add_polygon_patch(ways["398694728"]["pts"], 0.0, mats["surf"], UV_PLAZA_TILE, ao=0.95)
-    gnd.add_polygon_patch([(-34.0, 23.0), (54.0, 24.0), (54.0, 79.5), (-34.0, 79.5)], 0.0, mats["surf"], UV_PLAZA_TILE, ao=0.95)
-    gnd.add_box(mats["surf"], 10.0, 15.0, -0.18, 220.0, 220.0, 0.16, 0.0, UV_ASPHALT, ao_bot=0.92, ao_top=0.92)
-    # Perimeter Qingzhuan Campus Walls
-    walls = [
-        ((-35.5, -40.6), (55.3, -39.3)),
-        ((55.3, -39.3), (54.3, 79.5)),
-        ((-35.5, -40.6), (-35.5, 79.5)),
-        ((-35.5, 79.5), (-8.5, 79.5)),
-        ((2.0, 79.5), (54.3, 79.5)),
-    ]
-    for a, b in walls:
-        L = math.hypot(b[0] - a[0], b[1] - a[1])
-        yaw = math.atan2(b[1] - a[1], b[0] - a[0])
-        gnd.add_box(mats["surf"], (a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, 0.0, L, 0.35, 2.5, yaw, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.96)
+    # 6 m red-brick entrance lane (replaces the invented 8.4 m avenue)
+    add_grid_patch(gnd, LANE_W, 23.9, LANE_E, 76.4, 0.03, mats["surf"], UV_RED_BRICK_WALK, cell=1.6)
+    add_grid_patch(gnd, LANE_W, 76.4, LANE_E, 80.1, 0.03, mats["surf"], UV_PLAZA_TILE, cell=1.6)
+    add_grid_patch(gnd, -10.2, 54.0, LANE_W, 68.0, 0.03, mats["surf"], UV_PLAZA_TILE, cell=1.6)
+    # Bare/gravel yard north of the courts (visible on imagery)
+    add_grid_patch(gnd, -12.0, 18.0, 32.0, 24.0, 0.02, mats["bare_soil"], (0.0, 0.0, 1.0, 1.0), cell=4.0)
+    # East Si Liu Tiao roadway + south sidewalk + gate apron
+    add_grid_patch(gnd, -62.0, 81.0, 66.0, 89.0, -0.02, mats["surf"], UV_ASPHALT, cell=4.0)
+    add_grid_patch(gnd, -62.0, 80.1, 66.0, 81.0, 0.0, mats["surf"], UV_PLAZA_TILE, cell=1.5)
+    add_grid_patch(gnd, -11.2, 80.1, -1.6, 82.6, 0.01, mats["surf"], UV_PLAZA_TILE, cell=1.2)
 
-    # ---- E-G1: 东四六条甲44号北大门 + 左青砖门房 + 限速5标志 ----
+    # ---- Walls: south yard perimeter + lane flanks -------------------------
+    add_wall_run(gnd, (-35.5, -40.6), (55.3, -39.3), WALL_H, 0.35, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    add_wall_run(gnd, (55.3, -39.3), (54.3, 24.1), WALL_H, 0.35, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    add_wall_run(gnd, (-35.5, -40.6), (-35.5, 24.0), WALL_H, 0.35, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    add_wall_run(gnd, (-35.5, 24.0), (LANE_W, 24.0), WALL_H, 0.35, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    add_wall_run(gnd, (LANE_E, 24.0), (54.3, 24.1), WALL_H, 0.35, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    # lane flanks (west side interrupted by the veranda annex at y 54..68)
+    add_wall_run(gnd, (LANE_W, 24.0), (LANE_W, 54.0), WALL_H, 0.30, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    add_wall_run(gnd, (LANE_W, 68.0), (LANE_W, 76.2), WALL_H, 0.30, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+    add_wall_run(gnd, (LANE_E, 24.0), (LANE_E, 76.2), WALL_H, 0.30, mats["surf"], UV_QINGZHUAN, mats["surf"], UV_GREY_TILE)
+
+    # ---- E-G1 : north gate, guardhouse, plaques, barriers ------------------
     eg1 = exp.add_node("E-G1")
-    # Deep burgundy twin square portal piers
-    eg1.add_box(mats["gates"], -7.2, 80.5, 0.0, 1.0, 1.0, 4.7, 0.0, UV_BURGUNDY, ao_bot=0.76, ao_top=0.98)
-    eg1.add_box(mats["gates"], 1.2, 80.5, 0.0, 1.0, 1.0, 4.7, 0.0, UV_BURGUNDY, ao_bot=0.76, ao_top=0.98)
-    # Crossbeam header + traditional overhanging grey barrel-tile roof eave
-    eg1.add_box(mats["gates"], -3.0, 80.5, 3.6, 9.6, 1.25, 1.25, 0.0, UV_BURGUNDY)
-    eg1.add_box(mats["surf"], -3.0, 80.5, 4.85, 10.6, 2.2, 0.55, 0.0, UV_GREY_TILE)
-    # Finial end posts & top beam crest
-    eg1.add_box(mats["surf"], -7.4, 80.5, 5.4, 0.55, 0.65, 0.72, 0.0, UV_QINGZHUAN)
-    eg1.add_box(mats["surf"], 1.4, 80.5, 5.4, 0.55, 0.65, 0.72, 0.0, UV_QINGZHUAN)
-    # School Name Plaque facing North onto 东四六条 (viewer at North looking South: East=left, West=right)
-    eg1.quad_enu(mats["gates"], (1.65, 81.03, 1.2), (0.75, 81.03, 1.2), (0.75, 81.03, 3.2), (1.65, 81.03, 3.2), UV_EAST_SIGN)
-    eg1.quad_enu(mats["gates"], (0.8, 81.03, 3.85), (-6.8, 81.03, 3.85), (-6.8, 81.03, 4.75), (0.8, 81.03, 4.75), UV_EAST_SIGN)
-    # Silver accordion gate slats across doorway
-    for si in range(11):
-        sx = -6.2 + si * 0.64
-        eg1.add_box(mats["white_alu"], sx, 80.3, 0.05, 0.10, 0.32, 1.65, 0.45)
-    # Left (East when facing from North!) Qingzhuan pitched-roof guardhouse
+    for px in (WEST_PIER, EAST_PIER):
+        eg1.add_box(mats["surf"], px, GATE_Y, 0.0, PIER + 0.08, PIER + 0.08, 0.20, 0.0, UV_QINGZHUAN)
+        eg1.add_box(mats["gates"], px, GATE_Y, 0.20, PIER, PIER, 4.35, 0.0, UV_BURGUNDY, ao_bot=0.74, ao_top=0.98)
+    # beam + deep maroon fascia + tiled coping + upright tile row
+    eg1.add_box(mats["gates"], GX, GATE_Y, 4.55, OPEN + 2 * PIER + 0.10, PIER + 0.06, 0.45, 0.0, UV_BURGUNDY)
+    eg1.add_box(mats["gates"], GX, GATE_Y, 5.00, OPEN + 2 * PIER + 0.35, PIER + 0.20, 0.85, 0.0, UV_BURGUNDY, ao_bot=0.86, ao_top=1.0)
+    eg1.add_box(mats["surf"], GX, GATE_Y, 5.85, OPEN + 2 * PIER + 0.55, PIER + 0.36, 0.10, 0.0, UV_GREY_TILE)
+    for i in range(17):
+        tx = GX - 3.20 + i * (6.40 / 16.0)
+        eg1.add_box(mats["surf"], tx, GATE_Y, 5.95, 0.20, 0.18, 0.22, 0.0, UV_GREY_TILE)
+    for px in (GX - 3.45, GX + 3.45):
+        eg1.add_box(mats["surf"], px, GATE_Y, 5.85, 0.36, 0.36, 0.60, 0.0, UV_QINGZHUAN)
+    # LED screen (off, dark) on the beam's north face
+    eg1.add_box(mats["dark_steel"], GX, GATE_Y + 0.46, 3.83, 4.72, 0.06, 0.70, 0.0, (0.1, 0.1, 0.9, 0.9))
+    eg1.quad_enu(mats["led_off"], (GX - 2.30, GATE_Y + 0.50, 3.88), (GX + 2.30, GATE_Y + 0.50, 3.88),
+                 (GX + 2.30, GATE_Y + 0.50, 4.50), (GX - 2.30, GATE_Y + 0.50, 4.50),
+                 (0.0, 0.0, 1.0, 1.0), 1.0, 1.0, double_sided=True)
+    # vertical white plaque on the WEST pier (north face)
+    eg1.add_box(mats["dark_steel"], WEST_PIER, GATE_Y + 0.44, 1.10, 0.34, 0.03, 2.10, 0.0, (0.1, 0.1, 0.9, 0.9))
+    eg1.quad_enu(mats["gates"], (WEST_PIER - 0.15, GATE_Y + 0.47, 1.20), (WEST_PIER + 0.15, GATE_Y + 0.47, 1.20),
+                 (WEST_PIER + 0.15, GATE_Y + 0.47, 3.10), (WEST_PIER - 0.15, GATE_Y + 0.47, 3.10),
+                 UV_WEST_PLAQUE, 1.0, 1.0, double_sided=True)
+    # stainless steel school plaque + address plate + security sign on guardhouse wall
+    eg1.add_box(mats["stainless"], -2.05, GATE_Y + 0.42, 1.93, 1.42, 0.03, 0.56, 0.0, (0.05, 0.05, 0.95, 0.95))
+    eg1.quad_enu(mats["gates"], (-2.72, GATE_Y + 0.45, 1.97), (-1.38, GATE_Y + 0.45, 1.97),
+                 (-1.38, GATE_Y + 0.45, 2.49), (-2.72, GATE_Y + 0.45, 2.49),
+                 UV_EAST_SIGN, 1.0, 1.0, double_sided=True)
+    eg1.add_box(mats["sign_red"], -3.02, GATE_Y + 0.42, 1.44, 0.52, 0.02, 0.34, 0.0, (0.0, 0.0, 1.0, 1.0))
+    eg1.add_box(mats["plaque_white"], -3.02, GATE_Y + 0.44, 1.47, 0.44, 0.02, 0.28, 0.0, (0.0, 0.0, 1.0, 1.0))
+    eg1.add_box(mats["sign_blue"], -1.95, GATE_Y + 0.42, 2.78, 0.56, 0.02, 0.38, 0.0, (0.0, 0.0, 1.0, 1.0))
+    # folding gate: vertical pickets + X braces + tracks + caster wheels
+    bays = 12
+    bw = OPEN / bays
+    for i in range(bays + 1):
+        bx = GX - OPEN * 0.5 + i * bw
+        eg1.add_box(mats["white_alu"], bx, GATE_Y - 0.30, 0.05, 0.045, 0.045, 1.68, 0.0, (0.1, 0.1, 0.9, 0.9))
+    for i in range(bays):
+        x0 = GX - OPEN * 0.5 + i * bw
+        x1 = x0 + bw
+        yb = GATE_Y - 0.30
+        add_ribbon(eg1, mats["white_alu"], (x0, yb, 0.18), (x1, yb, 1.52), 0.032)
+        add_ribbon(eg1, mats["white_alu"], (x0, yb, 1.52), (x1, yb, 0.18), 0.032)
+        if i % 2 == 0:
+            eg1.add_cylinder(mats["orange_hoop"], x0, yb, 0.0, 0.07, 0.07, 0.10, 8, (0.1, 0.1, 0.9, 0.9))
+    for ty in (GATE_Y - 0.36, GATE_Y - 0.24):
+        eg1.add_box(mats["stainless"], GX, ty, 0.01, OPEN + 0.3, 0.05, 0.02, 0.0, (0.1, 0.1, 0.9, 0.9))
+    # card reader pillar (west side of the opening)
+    eg1.add_box(mats["stainless"], GX - OPEN * 0.5 - 0.28, GATE_Y - 0.75, 0.0, 0.26, 0.26, 1.18, 0.0, (0.1, 0.1, 0.9, 0.9))
+    eg1.add_box(mats["led"], GX - OPEN * 0.5 - 0.28, GATE_Y - 0.88, 0.80, 0.16, 0.02, 0.12, 0.0, (0.05, 0.05, 0.95, 0.95))
+    # guardhouse (east of gate), grey brick with shallow tiled roof
     eg1.add_pitched_gable_building(
-        cx=5.4, cy_n=78.5, w=6.8, d=4.8, eave_h=3.2, ridge_h=1.2, yaw_rad=0.0,
+        cx=0.20, cy_n=78.55, w=7.0, d=4.7, eave_h=3.05, ridge_h=0.75, yaw_rad=0.0,
         wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN,
         roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
         win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
         wood_mat=mats["dark_steel"], stories=1, ridge_along_x=True,
     )
-    # Ground "5" speed limit roundel in front of gate
-    eg1.quad_enu(mats["gates"], (-4.2, 82.5, 0.02), (-1.8, 82.5, 0.02), (-1.8, 84.9, 0.02), (-4.2, 84.9, 0.02), UV_SPEED_5)
+    # two white A-frame barriers
+    for bx in (-11.4, 1.9):
+        for sx in (-0.55, 0.55):
+            add_ribbon(eg1, mats["white_alu"], (bx + sx * 0.35, 83.0, 0.0), (bx, 83.0, 1.05), 0.07)
+        eg1.add_box(mats["white_alu"], bx, 83.0, 1.02, 1.0, 0.07, 0.07, 0.0, (0.1, 0.1, 0.9, 0.9))
+        eg1.add_box(mats["sign_red"], bx, 83.0, 1.06, 0.55, 0.075, 0.10, 0.0, (0.1, 0.1, 0.9, 0.9))
+    # white/red "5" roundel + two manhole covers
+    eg1.quad_enu(mats["gates"], (GX - 1.15, 83.55, 0.03), (GX + 1.15, 83.55, 0.03),
+                 (GX + 1.15, 85.85, 0.03), (GX - 1.15, 85.85, 0.03), UV_SPEED_5, 1.0, 1.0, double_sided=True)
+    for hx, hy in ((GX - 1.9, 82.9), (GX + 1.7, 83.2)):
+        eg1.add_cylinder(mats["dark_steel"], hx, hy, 0.01, 0.34, 0.34, 0.02, 12, (0.1, 0.1, 0.9, 0.9))
 
-    # ---- E-N1: 55m中轴红砖林荫甬道 + 双排行道大树 ----
+    # ---- E-N1 : 56 m brick lane + west veranda annex + east tree court -----
     en1 = exp.add_node("E-N1")
-    en1.add_polygon_patch([(-7.2, 22.0), (1.2, 22.0), (1.2, 79.0), (-7.2, 79.0)], 0.04, mats["surf"], UV_RED_BRICK_WALK, ao=0.98)
-    for row_x in (-11.0, 5.2):
-        for ty in (29.0, 41.0, 53.0, 65.0, 75.0):
-            en1.add_tree(row_x, ty, "broad", 10.5, mats["trunk"], mats["leaf"])
-
-    # ---- E-N2 & E-N3: 北院东西两侧传统四合院平房肌理（原徐世昌弢园）----
-    en2 = exp.add_node("E-N2")
-    en2.add_pitched_gable_building(
-        cx=24.0, cy_n=48.0, w=28.0, d=10.5, eave_h=3.6, ridge_h=1.7, yaw_rad=0.0,
-        wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN, roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
-        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW, wood_mat=mats["crimson"], stories=1, ridge_along_x=True,
+    # single-storey veranda building on the west side (facade opens onto the lane)
+    en1.add_pitched_gable_building(
+        cx=-13.50, cy_n=61.0, w=7.0, d=14.0, eave_h=3.30, ridge_h=1.05, yaw_rad=0.0,
+        wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN,
+        roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
+        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
+        wood_mat=mats["dark_steel"], stories=1, ridge_along_x=False,
     )
-    en2.add_pitched_gable_building(
-        cx=24.0, cy_n=66.0, w=28.0, d=9.5, eave_h=3.6, ridge_h=1.6, yaw_rad=0.0,
-        wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN, roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
-        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW, wood_mat=mats["crimson"], stories=1, ridge_along_x=True,
-    )
+    # lean-to veranda canopy + posts facing the lane
+    en1.add_box(mats["surf"], -9.45, 61.0, 2.95, 1.20, 13.6, 0.10, 0.0, UV_GREY_TILE)
+    for py in (54.9, 58.9, 62.9, 66.9):
+        en1.add_cylinder(mats["crimson"], -9.15, py, 0.0, 0.09, 0.09, 2.95, 8)
+    # east side: walled tree courtyard (no buildings within 8 m of the lane)
+    for tx, ty, sp, th in ((0.6, 74.0, "cedar", 9.0), (3.6, 68.0, "broad", 11.0),
+                           (1.4, 62.0, "cedar", 8.2), (4.6, 56.0, "broad", 10.0),
+                           (2.2, 50.5, "broad", 9.0)):
+        en1.add_tree(tx, ty, sp, th, mats["trunk"], mats["leaf"])
+    # two trees behind the west annex
+    en1.add_tree(-14.2, 72.0, "broad", 10.0, mats["trunk"], mats["leaf"])
+    en1.add_tree(-15.5, 45.0, "broad", 9.0, mats["trunk"], mats["leaf"])
 
-    en3 = exp.add_node("E-N3")
-    en3.add_pitched_gable_building(
-        cx=-22.5, cy_n=52.0, w=14.0, d=24.0, eave_h=3.6, ridge_h=1.6, yaw_rad=0.0,
-        wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN, roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
-        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW, wood_mat=mats["crimson"], stories=1, ridge_along_x=False,
-    )
-
-    # ---- E-P1: 南院双联标准篮球场 + 红色塑胶边 + 4套篮球架 ----
+    # ---- E-P1 : two measured courts + buffer + fence + floodlights ---------
     ep1 = exp.add_node("E-P1")
-    ep1.add_polygon_patch([(-6.0, -16.0), (31.0, -15.5), (30.5, 19.0), (-6.0, 18.5)], 0.04, mats["surf"], UV_TRACK_EPDM, ao=0.98)
+    add_grid_patch(ep1, -6.0, -16.0, 31.0, 19.0, 0.04, mats["surf"], UV_TRACK_EPDM, cell=2.2, ao=0.98)
     for wid in ("838569683", "838569684"):
         pts = ways[wid]["pts"]
         ep1.add_polygon_patch(pts, 0.07, mats["surf"], UV_COURT_GREEN, ao=1.0)
         xs = [p[0] for p in pts]
         ys = [p[1] for p in pts]
-        mx = (min(xs) + max(xs)) * 0.5
-        # White court border markings
-        c_pts = ensure_ccw(pts)
-        for i in range(len(c_pts)):
-            a, b = c_pts[i], c_pts[(i + 1) % len(c_pts)]
-            L = math.hypot(b[0] - a[0], b[1] - a[1])
-            ep1.add_box(mats["white_alu"], (a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, 0.08, L, 0.14, 0.02, math.atan2(b[1] - a[1], b[0] - a[0]))
-        add_basketball_hoop(ep1, mx, min(ys) - 0.6, 0.0, mats)
-        add_basketball_hoop(ep1, mx, max(ys) + 0.6, math.pi, mats)
-    # West teal mini-activity plaza (satellite visible north of E-B4)
-    ep1.add_polygon_patch([(-32.0, 4.5), (-11.0, 4.8), (-11.0, 18.5), (-32.0, 18.0)], 0.05, mats["surf"], UV_COURT_GREEN, ao=0.98)
+        cx = (min(xs) + max(xs)) * 0.5
+        cy = (min(ys) + max(ys)) * 0.5
+        add_court_markings(ep1, cx, cy, max(xs) - min(xs), max(ys) - min(ys), mats["white_alu"], 0.09)
+        add_basketball_hoop(ep1, cx, min(ys) - 0.6, 0.0, mats)
+        add_basketball_hoop(ep1, cx, max(ys) + 0.6, math.pi, mats)
+    # chain-link fence around the sports pad (3.2 m, gate gap on the west side)
+    fx0, fy0, fx1, fy1 = -6.0, -16.0, 31.0, 19.0
+    fence_runs = [((fx0, fy0), (fx1, fy0)), ((fx1, fy0), (fx1, fy1)),
+                  ((fx1, fy1), (fx0, fy1)), ((fx0, 2.0), (fx0, fy0)),
+                  ((fx0, fy1), (fx0, 4.6))]
+    post_mat = mats["dark_steel"]
+    for a, b in fence_runs:
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        yaw = math.atan2(b[1] - a[1], b[0] - a[0])
+        n = max(2, int(L / 3.0) + 1)
+        for i in range(n):
+            t = i / (n - 1)
+            px = a[0] + (b[0] - a[0]) * t
+            py = a[1] + (b[1] - a[1]) * t
+            ep1.add_cylinder(post_mat, px, py, 0.0, 0.06, 0.06, 3.2, 6, (0.1, 0.1, 0.9, 0.9))
+        ep1.add_box(post_mat, (a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, 3.16, L, 0.05, 0.05, yaw, (0.1, 0.1, 0.9, 0.9))
+        ep1.quad_enu(mats["fence_mesh"],
+                     (a[0], a[1], 0.10), (b[0], b[1], 0.10), (b[0], b[1], 3.15), (a[0], a[1], 3.15),
+                     (0.0, 0.0, 1.0, 1.0), 1.0, 1.0, double_sided=True)
+    # four floodlight masts
+    for lx, ly in ((fx0 + 0.6, fy0 + 0.6), (fx1 - 0.6, fy0 + 0.6), (fx0 + 0.6, fy1 - 0.6), (fx1 - 0.6, fy1 - 0.6)):
+        ep1.add_cylinder(mats["dark_steel"], lx, ly, 0.0, 0.14, 0.09, 8.0, 8)
+        ep1.add_box(mats["floodlight"], lx, ly, 7.55, 0.9, 0.22, 0.34, 0.0, (0.05, 0.05, 0.95, 0.95))
+        ep1.add_box(mats["dark_steel"], lx, ly, 7.90, 0.95, 0.30, 0.06, 0.0, (0.1, 0.1, 0.9, 0.9))
 
-    # ---- E-B1: 南主教学楼 (way 477977123, Green Roof!) ----
+    # ---- E-B1 : south main teaching building (green roof) ------------------
     eb1 = exp.add_node("E-B1")
     eb1.add_detailed_building(
         ways["477977123"]["pts"], stories=4, story_h=3.6, plinth_h=0.85,
@@ -2947,7 +3157,7 @@ def build_east_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
     )
 
-    # ---- E-B2: 西南 L 形教学楼 (way 477977122, Green Roof!) ----
+    # ---- E-B2 : south-west L building --------------------------------------
     eb2 = exp.add_node("E-B2")
     eb2.add_detailed_building(
         ways["477977122"]["pts"], stories=4, story_h=3.6, plinth_h=0.85,
@@ -2959,7 +3169,7 @@ def build_east_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
     )
 
-    # ---- E-B3: 东南教学配楼 (way 477977121) ----
+    # ---- E-B3 : south-east annex block -------------------------------------
     eb3 = exp.add_node("E-B3")
     eb3.add_detailed_building(
         ways["477977121"]["pts"], stories=3, story_h=3.5, plinth_h=0.75,
@@ -2971,7 +3181,7 @@ def build_east_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
     )
 
-    # ---- E-B4: 西中教学配楼 (way 477977120) ----
+    # ---- E-B4 : west mid building + blue-tile two-storey annex -------------
     eb4 = exp.add_node("E-B4")
     eb4.add_detailed_building(
         ways["477977120"]["pts"], stories=3, story_h=3.5, plinth_h=0.75,
@@ -2982,27 +3192,64 @@ def build_east_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         mullion_mat=mats["white_alu"],
         plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
     )
-
-    # ---- E-B5: 操场东缘灰瓦平房 ----
-    eb5 = exp.add_node("E-B5")
-    eb5.add_pitched_gable_building(
-        cx=43.0, cy_n=1.0, w=12.0, d=30.0, eave_h=3.5, ridge_h=1.5, yaw_rad=0.0,
-        wall_mat=mats["surf"], wall_uv=UV_QINGZHUAN, roof_mat=mats["surf"], roof_uv=UV_GREY_TILE,
-        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW, wood_mat=mats["dark_steel"], stories=1, ridge_along_x=False,
+    # north annex with blue tile roof + red diamond plaster (seen from the courts)
+    eb4.add_pitched_gable_building(
+        cx=-22.0, cy_n=8.0, w=16.0, d=12.0, eave_h=6.60, ridge_h=2.10, yaw_rad=0.0,
+        wall_mat=mats["details"], wall_uv=UV_NEIGHBOR_DIAMOND,
+        roof_mat=mats["details"], roof_uv=UV_BLUE_TILE_ROOF,
+        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
+        wood_mat=mats["dark_steel"], stories=2, ridge_along_x=True,
     )
 
-    # ---- Context_East: 60m Beijing Siheyuan Hutong Context ----
+    # ---- E-B5 : east edge green-roof building (was a 1-storey grey shed) ---
+    eb5 = exp.add_node("E-B5")
+    eb5.add_detailed_building(
+        [(37.0, -14.0), (49.0, -14.0), (49.0, 16.0), (37.0, 16.0)],
+        stories=2, story_h=3.6, plinth_h=0.55,
+        wall_mat=mats["surf"], wall_uv=UV_STUCCO,
+        band_mat=mats["surf"], band_uv=UV_QINGZHUAN,
+        roof_mat=mats["surf"], roof_uv=UV_GREEN_ROOF,
+        win_mat=mats["glass"], win_uv=UV_GLASS_WINDOW,
+        mullion_mat=mats["white_alu"],
+        plaster_plinth_mat=mats["surf"], plaster_plinth_uv=UV_QINGZHUAN,
+    )
+
+    # ---- Context_East : hutong neighbours around the lane ------------------
     ctx_e = exp.add_node("Context_East")
-    hutong_blocks = [
-        (-52, 102, 34, 14), (2, 102, 38, 16), (48, 102, 36, 14),
-        (-52, 48, 22, 38), (68, 46, 22, 36),
-        (-52, -16, 20, 48), (68, -14, 22, 46),
-        (-10, -56, 48, 14), (42, -56, 36, 14),
+    # neutral ground under the surrounding hutong blocks (avoids floating houses)
+    add_grid_patch(gnd, -36.0, 24.2, 56.0, 95.5, -0.01, mats["surf"], UV_ASPHALT, cell=6.0, ao=0.92)
+    add_grid_patch(gnd, -36.0, -64.0, 56.0, -40.8, -0.01, mats["surf"], UV_ASPHALT, cell=6.0, ao=0.92)
+    # lane-side houses: west row (outside the campus wall) and east row beyond x=10
+    houses = [
+        (-14.5, 73.0, 9.0, 9.0, 3.4), (-14.5, 47.0, 9.0, 12.0, 3.6),
+        (-16.0, 33.5, 10.0, 11.0, 3.4),
+        (-26.0, 70.0, 12.0, 12.0, 3.8), (-27.0, 54.0, 12.0, 12.0, 3.6),
+        (-27.0, 38.0, 12.0, 12.0, 3.6), (-26.0, 28.5, 12.0, 8.0, 3.4),
+        (14.0, 72.0, 10.0, 10.0, 3.6), (14.0, 58.0, 10.0, 10.0, 3.4),
+        (16.0, 42.0, 12.0, 12.0, 3.8), (18.0, 32.0, 12.0, 10.0, 3.4),
+        (30.0, 66.0, 14.0, 12.0, 3.8), (32.0, 48.0, 14.0, 14.0, 4.0),
+        (33.0, 30.0, 14.0, 12.0, 3.6),
+        (46.0, 72.0, 12.0, 12.0, 3.6), (47.0, 54.0, 12.0, 14.0, 3.8),
+        (47.0, 36.0, 12.0, 14.0, 3.6),
     ]
-    for bx, by, bw, bd in hutong_blocks:
-        ctx_e.add_box(mats["context"], bx, by, 0.0, bw, bd, 3.6, 0.0, ao_bot=0.72, ao_top=0.92)
+    for hx, hy, hw, hd, hh in houses:
+        add_hutong_house(ctx_e, hx, hy, hw, hd, hh, 0.0, mats["surf"], UV_QINGZHUAN,
+                         mats["surf"], UV_GREY_TILE, ridge=1.25, ridge_along_x=True)
+    # the light two-storey volume at the south end of the lane (ownership unconfirmed)
+    ctx_e.add_box(mats["surf"], 4.5, 41.0, 0.0, 9.0, 14.0, 6.9, 0.0, UV_STUCCO, ao_bot=0.8, ao_top=0.98)
+    ctx_e.add_box(mats["surf"], 4.5, 41.0, 6.9, 9.4, 14.4, 0.4, 0.0, UV_PLAZA_TILE)
+    # remaining distant hutong blocks (kept from the original context massing)
+    for bx, by, bw, bd in [(-52, 102, 34, 14), (2, 102, 38, 16), (48, 102, 36, 14),
+                           (-52, 48, 22, 38), (68, 46, 22, 36),
+                           (-52, -16, 20, 48), (68, -14, 22, 46),
+                           (-10, -56, 48, 14), (42, -56, 36, 14)]:
+        ctx_e.add_box(mats["context"], bx, by, 0.0, bw, bd, 3.6, 0.0, (0.0, 0.0, 1.0, 1.0), ao_bot=0.72, ao_top=0.92)
     ctx_e.add_tree(-30, 26, "broad", 9.0, mats["trunk"], mats["leaf"])
     ctx_e.add_tree(36, 22, "broad", 8.5, mats["trunk"], mats["leaf"])
+    # south yard trees (west wall, north edge, east corner)
+    for tx, ty, th in ((-33.0, -33.0, 10.0), (-33.0, -24.0, 9.0), (-22.0, 22.0, 11.0),
+                       (12.0, 22.0, 10.0), (52.0, 10.0, 9.0)):
+        ctx_e.add_tree(tx, ty, "broad", th, mats["trunk"], mats["leaf"])
 
     return exp.write_glb(out_glb)
 

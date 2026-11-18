@@ -254,16 +254,14 @@ def build_east_scene(east_json: dict, mats: Dict[str, bpy.types.Material], root_
     ways = {str(w["id"]): w for w in east_json["ways"]}
 
     add_extruded_polygon("Campus_Ground_East", ways["398694728"]["pts"], -0.18, 0.18, mats["ground"], root_col)
-    add_box("E-G1", -3.0, 80.5, 0.0, 10.6, 2.2, 5.4, mats["crimson"], root_col, bevel_width=0.03)
-    add_box("E-N1", -3.0, 50.5, 0.0, 8.4, 57.0, 0.08, mats["brick_red"], root_col, bevel_width=0.0)
-    add_box("E-N2", 24.0, 57.0, 0.0, 28.0, 27.5, 5.3, mats["qingzhuan"], root_col, bevel_width=0.03)
-    add_box("E-N3", -22.5, 52.0, 0.0, 14.0, 24.0, 5.2, mats["qingzhuan"], root_col, bevel_width=0.03)
+    add_box("E-G1", -6.55, 80.5, 0.0, 6.5, 1.0, 5.9, mats["crimson"], root_col, bevel_width=0.03)
+    add_box("E-N1", -6.35, 52.0, 0.0, 6.1, 56.4, 0.08, mats["brick_red"], root_col, bevel_width=0.0)
     add_box("E-P1", 12.0, 1.5, 0.0, 37.0, 34.5, 0.10, mats["court"], root_col, bevel_width=0.0)
     add_extruded_polygon("E-B1", ways["477977123"]["pts"], 0.0, 15.2, mats["stucco"], root_col, 0.04)
     add_extruded_polygon("E-B2", ways["477977122"]["pts"], 0.0, 15.2, mats["stucco"], root_col, 0.04)
     add_extruded_polygon("E-B3", ways["477977121"]["pts"], 0.0, 11.2, mats["stucco"], root_col, 0.04)
     add_extruded_polygon("E-B4", ways["477977120"]["pts"], 0.0, 11.2, mats["stucco"], root_col, 0.04)
-    add_box("E-B5", 43.0, 1.0, 0.0, 12.0, 30.0, 5.0, mats["qingzhuan"], root_col, bevel_width=0.03)
+    add_box("E-B5", 43.0, 1.0, 0.0, 12.0, 30.0, 8.6, mats["stucco"], root_col, bevel_width=0.03)
     add_box("Context_East", -52.0, 48.0, 0.0, 22.0, 38.0, 3.6, mats["context"], root_col, bevel_width=0.0)
 
 

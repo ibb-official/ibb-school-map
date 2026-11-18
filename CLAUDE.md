@@ -26,7 +26,7 @@
 | 维度 | 状态 |
 | --- | --- |
 | GitHub 仓库与协作者 | `ibb-official/ibb-school-map` 已配置 `.github/CODEOWNERS` 与 `ci.yml` / `deploy.yml` |
-| 3D `.glb` 模型与建模流水线 | **已完成**：`blender/` 脚本可重建 `public/models/west-campus.glb`（17 节点，约 3.2 MB）与 `east-campus.glb`（12 节点，约 2.0 MB），精细刻画门额牌匾、深凹窗格、3×5 金字塔天窗、弧形大坡道、张拉膜主席台与东四传统合院肌理 |
+| 3D `.glb` 模型与建模流水线 | **已完成**：`blender/` 脚本可重建 `public/models/west-campus.glb`（17 节点，约 3.2 MB）与 `east-campus.glb`（10 节点，约 2.7 MB），精细刻画门额牌匾、深凹窗格、3×5 金字塔天窗、弧形大坡道、张拉膜主席台，以及 2026-11 按影像与实景照片重测的东校区北巷门楼与南院球场 |
 | Web 应用与容器工程 | **已完成**（PR 验证中）：Next.js 15 + Three.js 实时 3D 浏览（含晨光/正午/夕照、射线拾取高亮、导览飞镜、投影点位标签）、2D 矢量 CAD 降级图、1.24 km 双校总览图、`/about` 项目介绍、`/disclaimer` 免责声明与资料来源页、`Dockerfile`（Node 20 Alpine）与 `docker-compose.yml` |
 | 生产环境接入 | **待部署配置**：`sofia-vps` `/opt/ibb-school-map/` 部署目录、`MAP_PORT`（默认 `3010`）、`edge-caddy` `map.bj166zx.cn` 站点块及仓库 Deploy Secrets |
 

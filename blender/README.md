@@ -27,7 +27,7 @@ Web 端 [src/data/places.ts](../src/data/places.ts) 与 [src/components/CampusSc
   - 东校区 `(0, 0, 0)` = 东校区南院双联篮球场中心区域
 - **节点命名表**：
   - 西校区：`Campus_Ground_West`, `W-G1`, `W-L1`, `W-L2`, `W-L3`, `W-B1`, `W-B2`, `W-B3`, `W-B4`, `W-B5`, `W-B6`, `W-H1`, `W-R1`, `W-ST1`, `W-MC`, `W-P1`, `W-P2`, `Context_West`
-  - 东校区：`Campus_Ground_East`, `E-G1`, `E-N1`, `E-N2`, `E-N3`, `E-P1`, `E-B1`, `E-B2`, `E-B3`, `E-B4`, `E-B5`, `Context_East`
+  - 东校区：`Campus_Ground_East`, `E-G1`, `E-N1`, `E-P1`, `E-B1`, `E-B2`, `E-B3`, `E-B4`, `E-B5`, `Context_East`
 
 ## 重建与修改方式
 
