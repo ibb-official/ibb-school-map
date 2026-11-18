@@ -24,7 +24,7 @@ export const CAMERA_TOURS: CameraTourStop[] = [
     id: "tour-w-ramp",
     campusId: "west",
     title: "坡道·B座绿地",
-    subtitle: "弧形大坡道、雪松庭院与冰心像/慎独石前 B 座立面",
+    subtitle: "弧形大坡道、雪松庭院、冰心像与入校中轴慎独石",
     lightingSuggestion: "noon",
     cameraPos: [6.0, 12.0, -28.0],
     cameraTarget: [-24.0, 5.0, -52.0],
