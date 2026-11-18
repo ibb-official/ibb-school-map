@@ -35,13 +35,13 @@ export const CAMPUSES: Record<CampusId, CampusMeta> = {
     id: "east",
     name: "东校区 · 东四六条甲44号",
     shortName: "东校区",
-    roleLabel: "高三毕业年级部（原徐世昌弢园旧址所在片区）",
+    roleLabel: "高三毕业年级部（原北京市第128中学）",
     address: "北京市东城区东四六条甲44号",
     district: "东城区 · 东四历史文化保护街区",
-    modelUrl: "/models/east-campus.glb?v=b95ef1fc",
-    approxAreaSqm: "约 8,800 m²（南北呈哑铃式前后两院格局）",
-    defaultCameraPos: [62, 64, 54],
-    defaultCameraTarget: [8, 4, -20],
+    modelUrl: "/models/east-campus.glb?v=1c668326",
+    approxAreaSqm: "约 6,200 m²（南院 5,769 m² + 北向入口巷约 340 m² + 门前约 120 m²）",
+    defaultCameraPos: [46, 50, 38],
+    defaultCameraTarget: [-4, 3, -18],
     panBounds: {
       minX: -85,
       maxX: 105,
@@ -59,7 +59,7 @@ export const CAMPUSES: Record<CampusId, CampusMeta> = {
       "东四五条 / 东四七条历史四合院保护胡同",
     ],
     summary:
-      "东校区呈独特的“北古南新”南北双院落布局：北侧自东四六条甲44号朱红门柱筒瓦门楼步入，沿 55 米红砖林荫甬道两侧分布青砖灰瓦合院平房肌理；南院则汇集四座绿色/灰色屋面教学楼、双联标准篮球场与活动广场。",
+      "东校区是倒 T 形格局：南院集中四栋教学楼、两片 13.6 × 25 m 球场与活动场地，场边有链式围网和四角灯杆；北侧经东四六条甲44号的深红门楼进入一条约 6 m 宽、56 m 长的红砖巷道，两侧紧贴院墙与平房（西侧有一栋带檐廊的单层房，东侧为树院），尽头接运动区。",
   },
 };
 
