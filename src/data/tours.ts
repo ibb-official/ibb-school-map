@@ -33,11 +33,11 @@ export const CAMERA_TOURS: CameraTourStop[] = [
   {
     id: "tour-w-stage",
     campusId: "west",
-    title: "主席台·假山平房",
-    subtitle: "深灰台基张拉膜主席台、太湖石假山、户外乒乓球台与高二挑廊平房",
+    title: "主席台·假山水池",
+    subtitle: "张拉膜主席台、靠东假山叠水池、左2右3乒乓球台与食堂北侧小门",
     lightingSuggestion: "morning",
-    cameraPos: [-28.0, 7.2, -103.0],
-    cameraTarget: [-26.5, 2.8, -129.8],
+    cameraPos: [-23.5, 6.8, -106.5],
+    cameraTarget: [-19.5, 2.4, -131.5],
   },
   {
     id: "tour-w-halld",
