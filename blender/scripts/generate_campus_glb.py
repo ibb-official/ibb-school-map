@@ -393,6 +393,34 @@ class NodeBuilder:
                     ao_top, ao_top, ao_top,
                 )
 
+    def add_sphere(
+        self,
+        mat: int,
+        cx: float, cy_n: float, cz: float,
+        rx: float, ry: float, rz: float,
+        segs: int = 10, rings: int = 6,
+        uv_box: UVBox = (0.0, 0.0, 1.0, 1.0),
+        ao: float = 0.95,
+    ) -> None:
+        """Low-poly UV sphere in ENU space (tree crowns, flowers, fruit, busts)."""
+        for i in range(rings):
+            phi0 = -math.pi * 0.5 + math.pi * i / rings
+            phi1 = -math.pi * 0.5 + math.pi * (i + 1) / rings
+            c0, c1 = math.cos(phi0), math.cos(phi1)
+            s0, s1 = math.sin(phi0), math.sin(phi1)
+            for j in range(segs):
+                th0 = 2.0 * math.pi * j / segs
+                th1 = 2.0 * math.pi * (j + 1) / segs
+                p00 = (cx + rx * c0 * math.cos(th0), cy_n + rz * c0 * math.sin(th0), cz + ry * s0)
+                p10 = (cx + rx * c0 * math.cos(th1), cy_n + rz * c0 * math.sin(th1), cz + ry * s0)
+                p11 = (cx + rx * c1 * math.cos(th1), cy_n + rz * c1 * math.sin(th1), cz + ry * s1)
+                p01 = (cx + rx * c1 * math.cos(th0), cy_n + rz * c1 * math.sin(th0), cz + ry * s1)
+                self.quad_enu(
+                    mat, p00, p10, p11, p01, uv_box,
+                    ao * (0.90 + 0.10 * (i / max(rings - 1, 1))),
+                    ao * (0.90 + 0.10 * ((i + 1) / max(rings - 1, 1))),
+                )
+
     def add_polygon_slab(
         self,
         poly_ccw: List[Vec2],
@@ -774,29 +802,86 @@ class NodeBuilder:
             self.tri_enu(wall_mat, wp(hw, hd, zt), wp(-hw, hd, zt), wp(0, hd, rh), (wu0, wv1), (wu1, wv1), (wum, wv0), 0.86, 0.86, 0.96)
             self.add_box(wood_mat, cx, cy_n, ground_z + rh - 0.06, 0.28, d + ov * 2, 0.24, yaw_rad)
 
-    def add_tree(self, cx: float, cy_n: float, species: str, h: float, trunk_mat: int, leaf_mat: int) -> None:
-        self.add_cylinder(trunk_mat, cx, cy_n, 0.0, 0.22, 0.14, h * 0.42, 7, ao_bot=0.65, ao_top=0.88)
+    def add_tree(
+        self,
+        cx: float, cy_n: float, species: str, h: float,
+        trunk_mat: int, leaf_mat: int,
+        accent_mat: Optional[int] = None,
+    ) -> None:
+        """Species-aware campus tree.
+
+        cedar 雪松 / pine 青松 / ginkgo 银杏 / magnolia 玉兰 /
+        persimmon 柿树 / rose 月季（花灌木）/ broad 落叶乔木。
+        """
+        if species == "rose":
+            # Low flowering shrub mass, no tall trunk
+            for k in range(5):
+                a = 2.0 * math.pi * k / 5.0
+                px = cx + 0.42 * math.cos(a)
+                py = cy_n + 0.42 * math.sin(a)
+                self.add_sphere(leaf_mat, px, py, h * 0.34, h * 0.30, h * 0.24, h * 0.30, 8, 4, UV_FOLIAGE, 0.94)
+            if accent_mat is not None:
+                for k in range(7):
+                    a = 2.0 * math.pi * k / 7.0
+                    px = cx + 0.38 * math.cos(a)
+                    py = cy_n + 0.38 * math.sin(a)
+                    self.add_sphere(accent_mat, px, py, h * 0.56, 0.10, 0.08, 0.10, 6, 3, (0.0, 0.0, 1.0, 1.0), 1.0)
+            return
+
+        trunk_h = h * (0.30 if species in ("pine", "cedar") else 0.40)
+        self.add_cylinder(trunk_mat, cx, cy_n, 0.0, 0.22, 0.14, trunk_h, 7, ao_bot=0.65, ao_top=0.88)
+
         if species == "cedar":
-            # Layered conical cedar foliage skirts (for giant Snow Cedar beside ramp & W-L1)
-            tiers = 5
+            # Narrow, layered Himalayan cedar: 6 skirts + a top spike
+            tiers = 7
             for ti in range(tiers):
-                f0 = 0.25 + ti * 0.15
-                f1 = f0 + 0.22
-                r = (h * 0.36) * (1.0 - ti * 0.17)
+                f0 = 0.26 + ti * 0.098
+                f1 = f0 + 0.155
+                r = (h * 0.18) * (1.0 - ti * 0.115)
                 self.add_cylinder(leaf_mat, cx, cy_n, h * f0, r, r * 0.22, h * (f1 - f0), 10, UV_FOLIAGE, ao_bot=0.74, ao_top=1.0)
+            self.add_cylinder(leaf_mat, cx, cy_n, h * 0.95, h * 0.045, 0.0, h * 0.05, 8, UV_FOLIAGE, 0.9, 1.0)
+        elif species == "pine":
+            # Chinese pine: irregular dark tiers, slightly leaning crown
+            for ti in range(4):
+                f0 = 0.34 + ti * 0.15
+                f1 = f0 + 0.20
+                r = (h * 0.26) * (1.0 - ti * 0.18)
+                ox = 0.10 * ti
+                self.add_cylinder(leaf_mat, cx + ox, cy_n, h * f0, r, r * 0.20, h * (f1 - f0), 9, UV_FOLIAGE, ao_bot=0.72, ao_top=0.98)
+            self.add_cylinder(leaf_mat, cx + 0.30, cy_n, h * 0.90, h * 0.05, 0.0, h * 0.06, 8, UV_FOLIAGE, 0.9, 1.0)
         else:
-            # Deciduous broad dome canopy (Locust / Pine / Magnolia)
-            segs = 10
-            r = h * 0.34
-            cz = h * 0.66
-            for ring_i in range(3):
-                phi0 = -0.35 + ring_i * 0.45
-                phi1 = phi0 + 0.48
-                r0 = r * math.cos(phi0)
-                r1 = max(0.05, r * math.cos(phi1))
-                z0 = cz + r * math.sin(phi0) * 0.8
-                z1 = cz + r * math.sin(phi1) * 0.85
-                self.add_cylinder(leaf_mat, cx, cy_n, z0, r0, r1, z1 - z0, segs, UV_FOLIAGE, ao_bot=0.76 + ring_i * 0.08, ao_top=0.92 + ring_i * 0.03)
+            # Broad deciduous crown built from overlapping spheres
+            crowns = [
+                (0.00, 0.00, 0.68, 0.34),
+                (-0.22, 0.06, 0.78, 0.26),
+                (0.20, -0.05, 0.80, 0.24),
+                (0.02, 0.16, 0.60, 0.24),
+            ]
+            for ox, oy, fz, fr in crowns:
+                self.add_sphere(
+                    leaf_mat, cx + ox * h, cy_n + oy * h, h * fz,
+                    h * fr, h * fr * 0.82, h * fr,
+                    9, 5, UV_FOLIAGE, 0.96,
+                )
+            if species == "magnolia" and accent_mat is not None:
+                for k in range(6):
+                    a = 2.0 * math.pi * k / 6.0
+                    px = cx + h * 0.26 * math.cos(a)
+                    py = cy_n + h * 0.26 * math.sin(a)
+                    self.add_sphere(accent_mat, px, py, h * (0.72 + 0.05 * (k % 2)), 0.11, 0.09, 0.11, 6, 3, (0.0, 0.0, 1.0, 1.0), 1.0)
+            elif species == "persimmon" and accent_mat is not None:
+                for k in range(8):
+                    a = 2.0 * math.pi * k / 8.0
+                    px = cx + h * 0.30 * math.cos(a)
+                    py = cy_n + h * 0.30 * math.sin(a)
+                    self.add_sphere(accent_mat, px, py, h * (0.58 + 0.12 * (k % 3)), 0.085, 0.085, 0.085, 6, 3, (0.0, 0.0, 1.0, 1.0), 1.0)
+            elif species == "ginkgo" and accent_mat is not None:
+                # Golden fan-shaped clumps at the crown edge
+                for k in range(5):
+                    a = 2.0 * math.pi * k / 5.0
+                    px = cx + h * 0.24 * math.cos(a)
+                    py = cy_n + h * 0.24 * math.sin(a)
+                    self.add_sphere(accent_mat, px, py, h * (0.62 + 0.06 * (k % 2)), 0.16, 0.12, 0.16, 6, 3, (0.0, 0.0, 1.0, 1.0), 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -970,7 +1055,7 @@ def init_materials(exp: GLBExporter, tex_dir: str, include_west_details: bool = 
 
     mats = {
         "gates": exp.add_mat("Mat_Gates", roughness=0.55, tex_idx=t_gates),
-        "led": exp.add_mat("Mat_LED", roughness=0.30, tex_idx=t_gates, emissive=(0.25, 0.10, 0.03)),
+        "led": exp.add_mat("Mat_LED", roughness=0.30, tex_idx=t_gates, emissive=(0.66, 0.035, 0.02)),
         "stage_led": exp.add_mat("Mat_StageLED", roughness=0.35, tex_idx=t_stage, emissive=(0.14, 0.16, 0.22)),
         "stage": exp.add_mat("Mat_StagePlaques", roughness=0.62, tex_idx=t_stage),
         "surf": exp.add_mat("Mat_Surfaces", roughness=0.82, tex_idx=t_surf),
@@ -983,6 +1068,16 @@ def init_materials(exp: GLBExporter, tex_dir: str, include_west_details: bool = 
         "tensile": exp.add_mat("Mat_TensileMembrane", base_color=(0.94, 0.95, 0.97, 1.0), roughness=0.45, double_sided=True),
         "trunk": exp.add_mat("Mat_Bark", base_color=(0.35, 0.27, 0.20, 1.0), roughness=0.92),
         "leaf": exp.add_mat("Mat_Foliage", base_color=(0.86, 0.94, 0.84, 1.0), roughness=0.85, tex_idx=t_surf),
+        "leaf_pine": exp.add_mat("Mat_PineFoliage", base_color=(0.10, 0.26, 0.16, 1.0), roughness=0.88),
+        "leaf_ginkgo": exp.add_mat("Mat_GinkgoGold", base_color=(0.68, 0.64, 0.18, 1.0), roughness=0.86),
+        "leaf_magnolia": exp.add_mat("Mat_MagnoliaLeaf", base_color=(0.18, 0.34, 0.19, 1.0), roughness=0.86),
+        "leaf_persimmon": exp.add_mat("Mat_PersimmonLeaf", base_color=(0.25, 0.38, 0.17, 1.0), roughness=0.86),
+        "flower_rose": exp.add_mat("Mat_RoseFlower", base_color=(0.74, 0.07, 0.12, 1.0), roughness=0.62),
+        "flower_white": exp.add_mat("Mat_MagnoliaFlower", base_color=(0.96, 0.94, 0.88, 1.0), roughness=0.60),
+        "fruit_orange": exp.add_mat("Mat_PersimmonFruit", base_color=(0.88, 0.38, 0.06, 1.0), roughness=0.55),
+        "bronze": exp.add_mat("Mat_BronzeStatue", base_color=(0.23, 0.15, 0.09, 1.0), metallic=0.62, roughness=0.38),
+        "stainless": exp.add_mat("Mat_StainlessGate", base_color=(0.72, 0.74, 0.76, 1.0), metallic=0.82, roughness=0.28),
+        "pavilion_wood": exp.add_mat("Mat_PavilionWood", base_color=(0.40, 0.11, 0.09, 1.0), roughness=0.62),
         "crimson": exp.add_mat("Mat_CrimsonWood", base_color=(0.68, 0.14, 0.14, 1.0), roughness=0.55),
         "orange_hoop": exp.add_mat("Mat_OrangeHoop", base_color=(0.92, 0.35, 0.08, 1.0), roughness=0.35),
         "green_rail": exp.add_mat("Mat_GreenRail", base_color=(0.12, 0.36, 0.22, 1.0), roughness=0.48),
@@ -1487,9 +1582,9 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         [(-35.5, 55.6), (-10.2, 68.0), (-5.2, 68.0), (-5.2, 72.8), (-5.8, 72.8), (-35.5, 57.5)],
         0.025, mats["surf"], UV_PLAZA_TILE, ao=0.97,
     )
-    # Low clipped ornamental shrubs immediately west of 慎独石 along B座 forecourt edge
-    for bsx, bsy, br in ((-8.3, 69.6, 0.48), (-9.4, 69.0, 0.42)):
-        gnd.add_cylinder(mats["leaf"], bsx, bsy, 0.03, br, br * 0.75, br * 1.35, 8, UV_FOLIAGE, ao_bot=0.74, ao_top=0.96)
+    # Low clipped ornamental shrubs flanking 慎独石 on the entry axis (N≈30)
+    for bsx, bsy, br in ((-4.25, 29.25, 0.42), (-1.05, 29.25, 0.38)):
+        gnd.add_cylinder(mats["leaf"], bsx, bsy, 0.03, br, br * 0.75, br * 1.30, 8, UV_FOLIAGE, ao_bot=0.74, ao_top=0.96)
 
     # Campus Perimeter Rendered Wall with Structural Pilasters & Coping (Photos 3 & 7)
     bound = ensure_ccw(ways["352521262"]["pts"])
@@ -1616,28 +1711,75 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         xoff = -3.4 + hi * 1.8
         gate.quad_enu(mats["yellow_hatch"], (xoff, -2.0, 0.015), (xoff + 0.14, -2.0, 0.015), (xoff + 0.14, 3.6, 0.015), (xoff, 3.6, 0.015))
 
-    # ---- W-L1: 慎独石 (located in front of B座 SE corner, facing South driveway) ----
+    # Stainless-steel retractable gate (half-open X-lattice) behind the ornamental leaves
+    gate.add_box(mats["stainless"], -0.45, 5.12, 1.62, 7.30, 0.06, 0.06, 0.0)
+    gate.add_box(mats["stainless"], -0.45, 5.12, 0.12, 7.30, 0.06, 0.06, 0.0)
+    for gi in range(10):
+        gx = -4.10 + gi * 0.735
+        z0, z1 = (0.15, 1.60) if gi % 2 == 0 else (1.60, 0.15)
+        gate.quad_enu(
+            mats["stainless"],
+            (gx, 5.12, z0), (gx + 0.66, 5.12, z1),
+            (gx + 0.66, 5.12, z1 + 0.035), (gx, 5.12, z0 + 0.035),
+            (0.1, 0.1, 0.9, 0.9), 0.92, 1.0, double_sided=True,
+        )
+    for gx in (-4.10 + 0.735 * k for k in range(11)):
+        gate.add_box(mats["stainless"], gx, 5.12, 0.12, 0.035, 0.035, 1.54, 0.0)
+
+    # Five yellow/black bollards in front of the gate
+    for bi in range(5):
+        bxp = -3.55 + bi * 1.50
+        gate.add_cylinder(mats["yellow_hatch"], bxp, 2.45, 0.0, 0.095, 0.085, 0.86, 10, ao_bot=0.78, ao_top=1.0)
+        gate.add_cylinder(mats["dark_steel"], bxp, 2.45, 0.42, 0.098, 0.098, 0.12, 10, ao_bot=0.86, ao_top=1.0)
+
+    # Gold-framed glass honours/notice case on the low wall just east of the gate (west face)
+    dcx, dcy = 5.54, 2.20
+    gate.add_box(mats["gold_trim"], dcx, dcy, 0.98, 0.10, 1.85, 1.45, 0.0, ao_bot=0.86, ao_top=1.0)
+    gate.add_box(mats["stage"], dcx - 0.02, dcy, 1.08, 0.06, 1.65, 1.25, 0.0, ao_bot=0.88, ao_top=1.0)
+    gate.quad_enu(
+        mats["glass"],
+        (dcx - 0.06, dcy - 0.80, 1.10), (dcx - 0.06, dcy + 0.80, 1.10),
+        (dcx - 0.06, dcy + 0.80, 2.28), (dcx - 0.06, dcy - 0.80, 2.28),
+        (0.1, 0.1, 0.9, 0.9), 0.94, 1.0, double_sided=True,
+    )
+
+    # ---- W-L1: 慎独石 (entry axis, ~N30, facing south; natural boulder + red vertical inscription) ----
     shendu = exp.add_node("W-L1")
-    shendu.add_box(mats["surf"], -6.6, 70.0, 0.025, 1.82, 1.06, 0.16, 0.0, UV_QINGZHUAN, ao_bot=0.72, ao_top=0.90)
+    shendu.add_box(mats["surf"], -2.6, 30.0, 0.025, 2.20, 1.50, 0.14, 0.0, UV_QINGZHUAN, ao_bot=0.72, ao_top=0.90)
     add_tapered_monolith(
         shendu,
-        -6.6, 70.0,
+        -2.6, 30.0,
         [
-            (0.18, 1.35, 1.56, 0.86, 1.48, 0.80),
-            (1.35, 2.45, 1.48, 0.80, 1.32, 0.72),
-            (2.45, 3.15, 1.32, 0.72, 0.96, 0.56),
-            (3.15, 3.52, 0.96, 0.56, 0.48, 0.34),
+            (0.14, 0.98, 1.12, 0.84, 1.08, 0.78),
+            (0.98, 1.78, 1.08, 0.78, 0.98, 0.70),
+            (1.78, 2.30, 0.98, 0.70, 0.74, 0.54),
+            (2.30, 2.58, 0.74, 0.54, 0.38, 0.28),
         ],
         mats["gates"], UV_SHENDU_GRANITE,
     )
-    shendu.quad_enu(mats["gates"], (-7.26, 69.55, 0.32), (-5.94, 69.55, 0.32), (-6.12, 69.65, 2.85), (-7.08, 69.65, 2.85), UV_SHENDU_STONE, 0.90, 1.0)
+    shendu.quad_enu(mats["gates"], (-3.08, 29.53, 0.30), (-2.12, 29.53, 0.30), (-2.24, 29.63, 2.10), (-2.96, 29.63, 2.10), UV_SHENDU_STONE, 0.90, 1.0)
+    # Low granite kerb + clipped hedge strips framing the stone on the axis
+    shendu.add_box(mats["surf"], -3.85, 29.15, 0.03, 1.25, 0.55, 0.36, 0.0, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.94)
+    shendu.add_box(mats["surf"], -1.35, 29.15, 0.03, 1.25, 0.55, 0.36, 0.0, UV_QINGZHUAN, ao_bot=0.76, ao_top=0.94)
+    # Teaching-building front pines (校方供稿：教学楼前青松)
+    gnd.add_tree(-4.55, 33.6, "pine", 7.6, mats["trunk"], mats["leaf_pine"])
+    gnd.add_tree(-4.30, 41.0, "pine", 6.8, mats["trunk"], mats["leaf_pine"])
 
-    # ---- W-L3: 冰心像 (B座南侧绿地北部，靠近 B 座南侧人行通道与庭院) ----
+    # ---- W-L3: 冰心像 (bronze portrait bust on stone pedestal, magnolia beside it) ----
     bx_node = exp.add_node("W-L3")
     bx_node.add_box(mats["surf"], -16.5, 58.8, 0.03, 3.0, 3.0, 0.18, 0.0, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.92)
-    bx_node.add_box(mats["white_alu"], -16.5, 58.8, 0.18, 1.5, 1.5, 0.25, 0.0)
+    bx_node.add_box(mats["white_alu"], -16.5, 58.8, 0.18, 1.50, 1.50, 0.25, 0.0)
     bx_node.add_box(mats["gates"], -16.5, 58.8, 0.43, 0.86, 0.86, 1.35, 0.0, UV_MARBLE, ao_bot=0.80, ao_top=0.98)
-    bx_node.add_cylinder(mats["dark_steel"], -16.5, 58.8, 1.78, 0.36, 0.22, 0.82, 12, ao_bot=0.78, ao_top=1.0)
+    # Bronze plaque on the south face of the pedestal
+    bx_node.quad_enu(mats["gold_trim"], (-17.02, 58.28, 0.72), (-15.98, 58.28, 0.72), (-15.98, 58.28, 1.12), (-17.02, 58.28, 1.12), (0.1, 0.1, 0.9, 0.9), 0.92, 1.0)
+    # Bust: chest, shoulders, neck, head, hair cap; total height ~2.65 m
+    bx_node.add_cylinder(mats["bronze"], -16.5, 58.8, 1.78, 0.34, 0.26, 0.46, 12, ao_bot=0.80, ao_top=1.0)
+    bx_node.add_box(mats["bronze"], -16.5, 58.8, 1.92, 0.62, 0.34, 0.34, 0.0, ao_bot=0.82, ao_top=1.0)
+    bx_node.add_cylinder(mats["bronze"], -16.5, 58.8, 2.24, 0.095, 0.085, 0.14, 10, ao_bot=0.86, ao_top=1.0)
+    bx_node.add_sphere(mats["bronze"], -16.5, 58.8, 2.44, 0.155, 0.195, 0.145, 12, 8, (0.0, 0.0, 1.0, 1.0), 1.0)
+    bx_node.add_sphere(mats["bronze"], -16.5, 58.86, 2.53, 0.165, 0.135, 0.150, 12, 6, (0.0, 0.0, 1.0, 1.0), 0.94)
+    # Magnolia beside the statue (white flowers)
+    bx_node.add_tree(-19.35, 58.15, "magnolia", 8.6, mats["trunk"], mats["leaf_magnolia"], mats["flower_white"])
 
     # ---- Connected 6-Story Complex: W-B1 (C座) + W-B2 (中部北凸枢纽) + W-B3 (B座) ----
     # Exact north stepped profile verified from OSM `way 398697589` + Photos 2, 4 & 6:
@@ -1661,6 +1803,44 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         window_grille=True, grille_mat=mats["white_alu"],
         bay_w=4.4,
     )
+    # Projecting balconies on the south facade (real B座: white rails + terracotta side panels + red flower boxes)
+    ba = (-35.5, 57.5)
+    bb = (-5.8, 72.8)
+    bl = math.hypot(bb[0] - ba[0], bb[1] - ba[1])
+    btx, bty = (bb[0] - ba[0]) / bl, (bb[1] - ba[1]) / bl
+    bnx, bny = bty, -btx
+    byaw = math.atan2(bty, btx)
+    for fl in range(1, 6):
+        bz = 0.80 + fl * 3.45
+        for bi in range(7):
+            along = 2.4 + bi * 4.30
+            if along > bl - 1.2:
+                continue
+            px = ba[0] + btx * along + bnx * 0.58
+            py = ba[1] + bty * along + bny * 0.58
+            wb3.add_box(mats["white_alu"], px, py, bz, 3.70, 1.14, 0.14, byaw, ao_bot=0.84, ao_top=0.98)
+            for s in (-1, 1):
+                sx = px + btx * s * 1.82
+                sy = py + bty * s * 1.82
+                wb3.add_box(mats["surf"], sx, sy, bz + 0.14, 0.14, 1.05, 0.55, byaw, UV_TERRACOTTA_BRICK, 0.84, 0.98)
+            for rz in (0.48, 0.78, 1.08):
+                rx = px + bnx * 0.52
+                ry = py + bny * 0.52
+                wb3.add_box(mats["white_alu"], rx, ry, bz + rz, 3.55, 0.05, 0.05, byaw, ao_bot=0.90, ao_top=1.0)
+            fx = px + bnx * 0.50
+            fy = py + bny * 0.50
+            wb3.add_box(mats["crimson"], fx, fy, bz + 0.92, 2.60, 0.22, 0.20, byaw, ao_bot=0.86, ao_top=1.0)
+            for fi in range(4):
+                wb3.add_sphere(
+                    mats["flower_rose"],
+                    fx + btx * (-0.90 + fi * 0.60), fy + bty * (-0.90 + fi * 0.60),
+                    bz + 1.16, 0.10, 0.08, 0.10, 6, 3, (0.0, 0.0, 1.0, 1.0), 1.0,
+                )
+    for aac, zac in ((6.0, 11.5), (18.5, 14.9), (28.0, 18.3)):
+        acx = ba[0] + btx * aac + bnx * 0.18
+        acy = ba[1] + bty * aac + bny * 0.18
+        add_ac_unit(wb3, acx, acy, zac, byaw, mats)
+
     # East gable vertical calligraphy ("北京市第一六六中学（原贝满女中、女十二中）") south of W-ST1
     wb3.quad_enu(mats["stage"], (-6.02, 74.15, 6.2), (-7.52, 77.25, 6.2), (-7.52, 77.25, 19.8), (-6.02, 74.15, 19.8), UV_B_WALL_SIGN, 0.92, 1.0)
     # South-east facing red "B 教学楼" open-book plaque
@@ -2033,6 +2213,9 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     )
     wst1.add_polygon_patch(pass_roof_pts, 3.664, mats["surf"], UV_PLAZA_TILE, ao=0.98)
 
+    # Ginkgo on the west side of the corner stair (校方供稿：转角楼梯一侧银杏)
+    wst1.add_tree(-8.2, 86.0, "ginkgo", 9.2, mats["trunk"], mats["leaf"], mats["leaf_ginkgo"])
+
     # ---- W-MC: 音乐长廊（始于音乐长廊牌楼 y≈81.5，沿 C 座西侧向南延伸；操场西侧不设棚廊） ----
     wmc = exp.add_node("W-MC")
     # Archway / glazed entrance portal at south edge of track southwest plaza (y=76.25..81.45)
@@ -2079,17 +2262,48 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
         UV_SKYLIGHT, 0.94, 1.0, double_sided=True,
     )
 
-    # ---- W-L2: 百草园内庭绿地（无亭子，含草坪、园路、乔灌木） ----
+    # ---- W-L2: 百草园内庭绿地（含中式方亭、月季花境与青松/银杏/柿树/玉兰） ----
     wl2 = exp.add_node("W-L2")
     wl2.add_polygon_patch([(-67.2, 39.0), (-45.5, 39.0), (-45.5, 57.2), (-67.2, 57.2)], 0.04, mats["surf"], UV_GRASS, ao=0.94)
     # Stone garden cross paths & central circular bed
     wl2.add_polygon_patch([(-66.5, 47.0), (-46.2, 47.0), (-46.2, 49.0), (-66.5, 49.0)], 0.06, mats["surf"], UV_PLAZA_TILE, ao=0.98)
     wl2.add_polygon_patch([(-57.4, 39.5), (-55.4, 39.5), (-55.4, 56.8), (-57.4, 56.8)], 0.06, mats["surf"], UV_PLAZA_TILE, ao=0.98)
     wl2.add_cylinder(mats["surf"], -56.4, 48.0, 0.05, 2.2, 2.2, 0.22, 12, UV_QINGZHUAN, ao_bot=0.80, ao_top=0.95)
-    wl2.add_tree(-61.5, 44.0, "cedar", 8.5, mats["trunk"], mats["leaf"])
-    wl2.add_tree(-50.0, 44.5, "broad", 8.0, mats["trunk"], mats["leaf"])
-    wl2.add_tree(-62.0, 52.5, "broad", 7.8, mats["trunk"], mats["leaf"])
-    wl2.add_tree(-50.5, 53.0, "broad", 7.2, mats["trunk"], mats["leaf"])
+    # Small Chinese pavilion (亭子) in the south-east quadrant of the garden, per school history text
+    pv_x, pv_y = -52.4, 43.2
+    wl2.add_box(mats["gates"], pv_x, pv_y, 0.12, 4.60, 4.60, 0.18, 0.0, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.96)
+    for px, py in ((pv_x - 1.50, pv_y - 1.50), (pv_x + 1.50, pv_y - 1.50),
+                   (pv_x - 1.50, pv_y + 1.50), (pv_x + 1.50, pv_y + 1.50)):
+        wl2.add_cylinder(mats["pavilion_wood"], px, py, 0.30, 0.135, 0.120, 2.85, 8, ao_bot=0.78, ao_top=0.98)
+    for bx, by, bw, bd in ((pv_x, pv_y - 1.50, 3.30, 0.18), (pv_x, pv_y + 1.50, 3.30, 0.18),
+                           (pv_x - 1.50, pv_y, 0.18, 3.30), (pv_x + 1.50, pv_y, 0.18, 3.30)):
+        wl2.add_box(mats["pavilion_wood"], bx, by, 3.05, bw, bd, 0.20, 0.0, ao_bot=0.84, ao_top=1.0)
+    # Hipped roof: four triangular slopes + ridge cap + finial
+    eave_z, apex_z = 3.25, 4.55
+    e = 2.35
+    corners = [(pv_x - e, pv_y - e), (pv_x + e, pv_y - e), (pv_x + e, pv_y + e), (pv_x - e, pv_y + e)]
+    for k in range(4):
+        a = corners[k]
+        b = corners[(k + 1) % 4]
+        tu0, tv0, tu1, tv1 = UV_GREY_TILE
+        wl2.tri_enu(
+            mats["surf"],
+            (a[0], a[1], eave_z), (b[0], b[1], eave_z), (pv_x, pv_y, apex_z),
+            (tu0, tv0), (tu1, tv0), ((tu0 + tu1) * 0.5, tv1),
+            0.92, 0.92, 1.0, double_sided=True,
+        )
+    wl2.add_box(mats["surf"], pv_x, pv_y, apex_z - 0.06, 0.55, 0.55, 0.16, 0.0, UV_GREY_TILE, ao_bot=0.92, ao_top=1.0)
+    wl2.add_cylinder(mats["gold_trim"], pv_x, pv_y, apex_z + 0.10, 0.07, 0.02, 0.55, 8, ao_bot=0.95, ao_top=1.0)
+    # Rose beds flanking the east-west garden path (月季)
+    for rx, ry, rw, rd in ((-63.6, 47.7, 3.6, 0.75), (-49.2, 47.7, 3.6, 0.75)):
+        wl2.add_box(mats["surf"], rx, ry, 0.06, rw, rd, 0.34, 0.0, UV_QINGZHUAN, ao_bot=0.80, ao_top=0.96)
+        for ri in range(6):
+            wl2.add_tree(rx - rw * 0.38 + ri * rw * 0.152, ry, "rose", 0.95, mats["trunk"], mats["leaf"], mats["flower_rose"])
+    # Species mix: 青松 / 银杏 / 柿树 / 玉兰
+    wl2.add_tree(-61.5, 43.6, "pine", 8.5, mats["trunk"], mats["leaf_pine"])
+    wl2.add_tree(-46.4, 38.2, "ginkgo", 7.4, mats["trunk"], mats["leaf"], mats["leaf_ginkgo"])
+    wl2.add_tree(-63.0, 53.6, "persimmon", 7.8, mats["trunk"], mats["leaf_persimmon"], mats["fruit_orange"])
+    wl2.add_tree(-48.2, 54.0, "magnolia", 7.2, mats["trunk"], mats["leaf_magnolia"], mats["flower_white"])
 
     # ---- W-P1: 北区 200m 环形塑胶操场 + 红绿双色篮球场 + 绿色桁架球架 + 排球网 + 道次号 ----
     wp1 = exp.add_node("W-P1")
@@ -2553,6 +2767,9 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     # "校史馆" plaque beside the glass entrance lobby
     wh1.quad_enu(mats["stage"], (gx_ent + 0.06, 135.72, 1.95), (gx_ent + 0.06, 136.66, 1.95), (gx_ent + 0.06, 136.66, 2.34), (gx_ent + 0.06, 135.72, 2.34), UV_HISTORY_SIGN, 0.95, 1.0)
 
+    # Persimmon outside the history museum (校方供稿：校史馆外柿树)
+    wh1.add_tree(-68.6, 137.4, "persimmon", 7.6, mats["trunk"], mats["leaf_persimmon"], mats["fruit_orange"])
+
     # ---- W-B6: 学生食堂（操场东侧 1层圆拱顶建筑，南端拱窗面对东侧通道） ----
     wb6 = exp.add_node("W-B6")
     caf_cx, caf_cy, caf_w, caf_d = 0.2, 112.0, 11.6, 31.0
@@ -2756,6 +2973,26 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     )
     # Salmon-pink corner bay & AC units right beside East Gate Pier (west-gate-2024.webp & west-gate-2020.webp!)
     ctx_w.add_box(mats["details"], 7.45, 5.65, 3.6, 2.5, 3.2, 11.8, 0.0, UV_SALMON_WALL, ao_bot=0.84, ao_top=0.98)
+    # Window grid on the west face so the bay reads as a residential corner, not a blank slab
+    for wy in (4.75, 6.55):
+        for wz in (4.55, 7.10, 9.65, 12.20):
+            ctx_w.quad_enu(
+                mats["glass"],
+                (6.18, wy - 0.52, wz), (6.18, wy + 0.52, wz),
+                (6.18, wy + 0.52, wz + 1.55), (6.18, wy - 0.52, wz + 1.55),
+                UV_GLASS_WINDOW, 0.92, 1.0, double_sided=True,
+            )
+            ctx_w.add_box(mats["white_alu"], 6.16, wy, wz - 0.06, 0.06, 1.18, 0.08, 0.0, ao_bot=0.90, ao_top=1.0)
+    # Window grid on the south face too (visible from the gate approach)
+    for wx in (6.95, 8.05):
+        for wz in (4.55, 7.10, 9.65, 12.20):
+            ctx_w.quad_enu(
+                mats["glass"],
+                (wx - 0.40, 4.03, wz), (wx + 0.40, 4.03, wz),
+                (wx + 0.40, 4.03, wz + 1.55), (wx - 0.40, 4.03, wz + 1.55),
+                UV_GLASS_WINDOW, 0.92, 1.0, double_sided=True,
+            )
+            ctx_w.add_box(mats["white_alu"], wx, 4.01, wz - 0.06, 0.96, 0.06, 0.08, 0.0, ao_bot=0.90, ao_top=1.0)
     for st_e_ac in (1, 2, 3):
         add_ac_unit(ctx_w, 6.22, 9.8, 0.8 + st_e_ac * 2.95, math.pi * 0.5, mats)
     # Ground-floor alley courtyard wall & cream display cabinet east of gate
@@ -2823,8 +3060,10 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
             ctx_w.add_polygon_slab(pts, 0.0, h, mats["surf"], mats["surf"], UV_STUCCO, UV_PLAZA_TILE, ao_bot=0.74, ao_top=0.95)
     # Campus, east passage & surrounding hutong trees
     for tx, ty, sp, th in [
-        (-22, 52, "broad", 8.5), (-35, 51, "broad", 8.0), (-9.2, 25.6, "broad", 7.2),
-        (1.0, 26, "broad", 7.8), (1.0, 44, "broad", 7.8), (-89.5, 134.8, "broad", 7.8),
+        (-22, 52, "broad", 8.5), (-35, 51, "broad", 8.0),
+        (5.0, 34, "broad", 7.5), (5.2, 48, "broad", 8.0),
+        (5.0, 62, "broad", 7.6), (5.2, 76, "broad", 8.2),
+        (-89.5, 134.8, "broad", 7.8),
         (-102.0, 92.0, "broad", 9.5), (-118.0, 90.0, "broad", 10.2),
     ]:
         ctx_w.add_tree(tx, ty, sp, th, mats["trunk"], mats["leaf"])
