@@ -553,18 +553,18 @@ do {
         }
     }
 
-    // (0,2) Running Track Terracotta EPDM (subtle granular texture; lane stripes drawn as clean geometry)
+    // (0,2) Running Track Terracotta EPDM (deep porous rubber granules; outer track + 4 corners)
     do {
         let r = cell(0, 2)
-        ctx.setFillColor(rgb(0.73, 0.28, 0.21))
+        ctx.setFillColor(rgb(0.68, 0.24, 0.18))
         ctx.fill(r)
         srand48(606)
-        for _ in 0..<1100 {
-            ctx.setFillColor(rgb(0.65, 0.24, 0.18, 0.42))
+        for _ in 0..<1400 {
+            ctx.setFillColor(rgb(0.58, 0.20, 0.15, 0.50))
             ctx.fill(CGRect(x: r.minX + CGFloat(drand48()) * 254, y: r.minY + CGFloat(drand48()) * 254, width: 3, height: 3))
         }
-        for _ in 0..<450 {
-            ctx.setFillColor(rgb(0.80, 0.34, 0.26, 0.25))
+        for _ in 0..<550 {
+            ctx.setFillColor(rgb(0.77, 0.31, 0.24, 0.30))
             ctx.fill(CGRect(x: r.minX + CGFloat(drand48()) * 254, y: r.minY + CGFloat(drand48()) * 254, width: 2, height: 2))
         }
     }
@@ -874,21 +874,48 @@ do {
         }
     }
 
-    // Tile 5: White River Pebbles Tree Pit Bed (x: 600..792, y: 276..532)
+    // Tile 5A: White River Pebbles Tree Pit Bed (x: 600..792, y: 276..398)
     do {
-        let r = CGRect(x: 600, y: 276, width: 192, height: 256)
+        let r = CGRect(x: 600, y: 276, width: 192, height: 122)
         ctx.setFillColor(rgb(0.24, 0.22, 0.20, 1.0))
         ctx.fill(r)
         srand48(1116)
-        for _ in 0..<420 {
+        for _ in 0..<240 {
             let px = r.minX + 6 + CGFloat(drand48()) * (r.width - 22)
-            let py = r.minY + 6 + CGFloat(drand48()) * (r.height - 22)
+            let py = r.minY + 6 + CGFloat(drand48()) * (r.height - 18)
             let pw = 7.0 + CGFloat(drand48()) * 9.0
             let ph = 5.0 + CGFloat(drand48()) * 7.0
             let v = 0.74 + CGFloat(drand48()) * 0.22
             ctx.setFillColor(rgb(v, v, v - 0.02, 0.95))
             ctx.fillEllipse(in: CGRect(x: px, y: py, width: pw, height: ph))
         }
+    }
+
+    // Tile 5B: Rockery Basin Reflective Pool Water + Waterfall Ripples (x: 600..792, y: 408..532, ALPHA)
+    do {
+        let r = CGRect(x: 600, y: 408, width: 192, height: 124)
+        ctx.clear(r)
+        ctx.setFillColor(rgb(0.11, 0.43, 0.52, 0.80))
+        ctx.fill(r)
+        ctx.saveGState()
+        ctx.clip(to: r)
+        // Subtle aqua caustic highlights & sky reflection bands
+        srand48(1660)
+        for _ in 0..<90 {
+            let wx = r.minX + CGFloat(drand48()) * (r.width - 24)
+            let wy = r.minY + CGFloat(drand48()) * (r.height - 10)
+            let ww = 12.0 + CGFloat(drand48()) * 26.0
+            ctx.setFillColor(rgb(0.36, 0.76, 0.86, 0.24))
+            ctx.fillEllipse(in: CGRect(x: wx, y: wy, width: ww, height: 4.5))
+        }
+        // Concentric white-aqua waterfall splash ripples near front-center
+        let splash = CGPoint(x: r.midX + 6, y: r.midY + 18)
+        for rad in [12.0, 24.0, 38.0, 54.0] as [CGFloat] {
+            ctx.setStrokeColor(rgb(0.84, 0.96, 1.0, 0.45))
+            ctx.setLineWidth(2.2)
+            ctx.strokeEllipse(in: CGRect(x: splash.x - rad, y: splash.y - rad * 0.68, width: rad * 2, height: rad * 1.36))
+        }
+        ctx.restoreGState()
     }
 
     // Tile 6A: Red Fire Extinguisher Box "灭火器箱 火警 119" (x: 808..1016, y: 276..412)
@@ -906,11 +933,17 @@ do {
         drawFlippedText("火警 119", in: CGRect(x: r.minX + 12, y: r.minY + 84, width: r.width - 24, height: 28), fontName: "PingFangSC-Semibold", size: 20, color: .white, align: .center, bold: true)
     }
 
-    // Tile 6B: Reserved neutral plaster swatch (no class doorplates per campus map rules)
+    // Tile 6B: Smooth Acrylic / Silicon-PU Hard Court Oval Infield Surface (x: 808..904, y: 420..532)
     do {
         let r = CGRect(x: 808, y: 420, width: 96, height: 112)
-        ctx.setFillColor(rgb(0.92, 0.92, 0.93, 1.0))
+        ctx.setFillColor(rgb(0.82, 0.45, 0.37, 1.0))
         ctx.fill(r)
+        srand48(1662)
+        for _ in 0..<180 {
+            let d = CGFloat(drand48() * 0.04 - 0.02)
+            ctx.setFillColor(rgb(0.84 + d, 0.47 + d, 0.39 + d, 0.45))
+            ctx.fill(CGRect(x: r.minX + CGFloat(drand48()) * 92, y: r.minY + CGFloat(drand48()) * 108, width: 4, height: 3))
+        }
     }
 
     // Tile 6C: Salmon-Pink Residential Accent Cladding (x: 912..1016, y: 420..532)

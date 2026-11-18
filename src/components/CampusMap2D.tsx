@@ -28,7 +28,8 @@ const POLY_FILL: Record<Map2DPolygon["kind"], string> = {
   academic: "#dce8f5",
   heritage: "#efe6d5",
   sports: "#fed7aa",
-  "sports-track": "#f2b8b5",
+  "sports-track": "#e28879",
+  "sports-infield": "#f6cfc4",
   "sports-court": "#a7f3d0",
   gate: "#fecaca",
   corridor: "#ccfbf1",
@@ -42,7 +43,8 @@ const POLY_STROKE: Record<Map2DPolygon["kind"], string> = {
   academic: "#155b96",
   heritage: "#8a6d3b",
   sports: "#c2410c",
-  "sports-track": "#c2410c",
+  "sports-track": "#b93822",
+  "sports-infield": "#c25943",
   "sports-court": "#0f766e",
   gate: "#b91c1c",
   corridor: "#0f766e",
@@ -476,15 +478,15 @@ export function CampusMap2D({
           );
         })}
 
-        {/* West Campus Oval Track Lanes, Two-Tone Courts, Volleyball Net & Micro-Landmarks */}
+        {/* West Campus Oval Track Lanes, Hard-Surface Courts, Water Rockery & 5 Ping-Pong Tables */}
         {campusId === "west" && (
-          <g pointerEvents="none" fill="none" stroke="rgba(255,255,255,0.88)">
-            {[14.35, 15.35, 16.4, 17.45, 18.45].map((r) => {
-              const inset = 18.5 - r;
-              const x = -89.5 + inset;
-              const y = -(124.5 - inset);
-              const w = -8.0 - inset - (-89.5 + inset);
-              const h = 37.0 - 2 * inset;
+          <g pointerEvents="none" fill="none" stroke="rgba(255,255,255,0.90)">
+            {[12.9, 13.925, 14.95, 15.975, 17.0].map((r) => {
+              const inset = 17.0 - r;
+              const x = -92.3 + inset;
+              const y = -(124.6 - inset);
+              const w = -14.3 - inset - (-92.3 + inset);
+              const h = 34.0 - 2 * inset;
               return (
                 <rect
                   key={`lane-${r}`}
@@ -498,53 +500,66 @@ export function CampusMap2D({
                 />
               );
             })}
-            {[-120.35, -121.35, -122.4, -123.45, -124.45].map((ly) => (
+            {[-120.5, -121.525, -122.55, -123.575, -124.6].map((ly) => (
               <line
                 key={`ne-lane-${ly}`}
-                x1={-26.6}
+                x1={-31.3}
                 y1={ly}
-                x2={-6.5}
+                x2={-9.5}
                 y2={ly}
                 strokeWidth="0.3"
               />
             ))}
-            <line x1={-7.0} y1={-124.48} x2={-7.0} y2={-120.32} strokeWidth="0.38" />
-            <line x1={-57.0} y1={-124.48} x2={-57.0} y2={-120.32} strokeWidth="0.38" />
+            <line x1={-9.8} y1={-124.62} x2={-9.8} y2={-120.48} strokeWidth="0.38" />
+            <line x1={-59.8} y1={-124.62} x2={-59.8} y2={-120.48} strokeWidth="0.38" />
             {[
-              [-69.5, -56.3],
-              [-54.7, -41.5],
-              [-39.9, -26.7],
+              [-74.8, -61.8],
+              [-59.8, -46.8],
+              [-44.8, -31.8],
             ].map(([cx0, cx1]) => {
               const cmid = (cx0 + cx1) * 0.5;
               return (
                 <g key={`court-${cx0}`} strokeWidth="0.32">
+                  {/* Green basketball court pad on top of lighter hard-surface oval infield */}
+                  <rect
+                    x={cx0 - 0.5}
+                    y={-119.55}
+                    width={cx1 - cx0 + 1.0}
+                    height={23.9}
+                    fill="#7dd9b2"
+                    stroke="none"
+                  />
                   {/* Terracotta 3-second painted keys & center jump circle */}
-                  <rect x={cmid - 2.4} y={-118.2} width={4.8} height={5.6} fill="rgba(194,65,12,0.34)" />
-                  <rect x={cmid - 2.4} y={-99.4} width={4.8} height={5.6} fill="rgba(194,65,12,0.34)" />
-                  <circle cx={cmid} cy={-106.0} r={1.8} fill="rgba(194,65,12,0.34)" />
+                  <rect x={cmid - 2.4} y={-119.1} width={4.8} height={5.5} fill="#d9775e" />
+                  <rect x={cmid - 2.4} y={-101.6} width={4.8} height={5.5} fill="#d9775e" />
+                  <circle cx={cmid} cy={-107.6} r={1.8} fill="#d9775e" />
                   {/* 3-point arcs */}
-                  <path d={`M ${(cmid - 5.9).toFixed(2)},-116.6 A 6.1,6.1 0 0 0 ${(cmid + 5.9).toFixed(2)},-116.6`} />
-                  <path d={`M ${(cmid - 5.9).toFixed(2)},-95.4 A 6.1,6.1 0 0 1 ${(cmid + 5.9).toFixed(2)},-95.4`} />
+                  <path d={`M ${(cmid - 5.8).toFixed(2)},-117.6 A 6.0,6.0 0 0 0 ${(cmid + 5.8).toFixed(2)},-117.6`} />
+                  <path d={`M ${(cmid - 5.8).toFixed(2)},-97.6 A 6.0,6.0 0 0 1 ${(cmid + 5.8).toFixed(2)},-97.6`} />
                   {/* Outer boundary & center line */}
-                  <rect x={cx0} y={-118.2} width={cx1 - cx0} height={24.4} />
-                  <line x1={cx0} y1={-106.0} x2={cx1} y2={-106.0} />
+                  <rect x={cx0} y={-119.1} width={cx1 - cx0} height={23.0} />
+                  <line x1={cx0} y1={-107.6} x2={cx1} y2={-107.6} />
                 </g>
               );
             })}
             {/* West Court Volleyball Net */}
             <line
-              x1={-69.9}
-              y1={-106.0}
-              x2={-55.9}
-              y2={-106.0}
+              x1={-75.2}
+              y1={-107.6}
+              x2={-61.4}
+              y2={-107.6}
               stroke="#ea580c"
               strokeWidth="0.5"
               strokeDasharray="0.9 0.5"
             />
-            {/* Skywell Tree (W-H1 North Entrance), Leaning Track-Edge Tree & Taihu Rockery Basin */}
+            {/* Skywell Tree (W-H1 North Entrance) & Inner Track-Edge Leaning Tree */}
             <circle cx={-75.05} cy={-134.55} r={1.15} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
-            <circle cx={-19.6} cy={-124.52} r={1.25} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
-            <circle cx={-26.0} cy={-129.8} r={2.2} fill="rgba(100,116,139,0.38)" stroke="#475569" strokeWidth="0.45" />
+            <circle cx={-22.0} cy={-120.25} r={1.15} fill="rgba(21,128,61,0.45)" stroke="#15803d" strokeWidth="0.35" />
+            {/* Water-Filled Rockery Basin (dark slate curb + blue pool water + dark stone core) */}
+            <circle cx={-20.6} cy={-131.5} r={2.25} fill="#38bdf8" fillOpacity={0.62} stroke="#334155" strokeWidth="0.55" />
+            <circle cx={-20.6} cy={-131.5} r={1.18} fill="#57534e" stroke="#e0f2fe" strokeWidth="0.28" />
+            {/* Small Door Indicator on W-B6 North Connecting Bay facing Campus */}
+            <line x1={-5.8} y1={-130.6} x2={-5.8} y2={-132.1} stroke="#ffffff" strokeWidth="0.7" />
             {/* 1F Bike Push-Through Passage (W-ST1 East Portal -> Bicycle Parking Zone) */}
             <path
               d="M 1.45,-73.8 L 1.45,-85.4 L -13.2,-85.4"
@@ -553,21 +568,19 @@ export function CampusMap2D({
               strokeDasharray="1.3 0.9"
             />
             <polygon points="-14.4,-85.4 -12.7,-86.2 -12.7,-84.6" fill="#0f766e" stroke="none" />
-            {[-30.0, -21.6, -16.8, -22.0].map((tx, idx) => {
-              const ty = [-128.4, -128.8, -129.0, -131.6][idx];
-              return (
-                <rect
-                  key={`pp-${tx}`}
-                  x={tx - 1.35}
-                  y={ty - 0.75}
-                  width={2.7}
-                  height={1.5}
-                  fill="#2563eb"
-                  stroke="#ffffff"
-                  strokeWidth="0.22"
-                />
-              );
-            })}
+            {/* 5 Outdoor Ping-Pong Tables: Left 2 + Right 3 flanking the Water Rockery */}
+            {[-29.2, -24.8, -16.2, -12.4, -8.6].map((tx) => (
+              <rect
+                key={`pp-${tx}`}
+                x={tx - 1.35}
+                y={-133.0 - 0.75}
+                width={2.7}
+                height={1.5}
+                fill="#2563eb"
+                stroke="#ffffff"
+                strokeWidth="0.22"
+              />
+            ))}
           </g>
         )}
 
