@@ -1735,7 +1735,7 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     # Gold-framed glass honours/notice case on the low wall just east of the gate (west face)
     dcx, dcy = 5.54, 2.20
     gate.add_box(mats["gold_trim"], dcx, dcy, 0.98, 0.10, 1.85, 1.45, 0.0, ao_bot=0.86, ao_top=1.0)
-    gate.add_box(mats["stage"], dcx - 0.02, dcy, 1.08, 0.06, 1.65, 1.25, 0.0, ao_bot=0.88, ao_top=1.0)
+    gate.add_box(mats["white_alu"], dcx - 0.02, dcy, 1.08, 0.06, 1.65, 1.25, 0.0, ao_bot=0.88, ao_top=1.0)
     gate.quad_enu(
         mats["glass"],
         (dcx - 0.06, dcy - 0.80, 1.10), (dcx - 0.06, dcy + 0.80, 1.10),
@@ -2271,7 +2271,7 @@ def build_west_campus(data_path: str, tex_dir: str, out_glb: str) -> Tuple[int, 
     wl2.add_cylinder(mats["surf"], -56.4, 48.0, 0.05, 2.2, 2.2, 0.22, 12, UV_QINGZHUAN, ao_bot=0.80, ao_top=0.95)
     # Small Chinese pavilion (亭子) in the south-east quadrant of the garden, per school history text
     pv_x, pv_y = -52.4, 43.2
-    wl2.add_box(mats["gates"], pv_x, pv_y, 0.12, 4.60, 4.60, 0.18, 0.0, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.96)
+    wl2.add_box(mats["surf"], pv_x, pv_y, 0.12, 4.60, 4.60, 0.18, 0.0, UV_QINGZHUAN, ao_bot=0.78, ao_top=0.96)
     for px, py in ((pv_x - 1.50, pv_y - 1.50), (pv_x + 1.50, pv_y - 1.50),
                    (pv_x - 1.50, pv_y + 1.50), (pv_x + 1.50, pv_y + 1.50)):
         wl2.add_cylinder(mats["pavilion_wood"], px, py, 0.30, 0.135, 0.120, 2.85, 8, ao_bot=0.78, ao_top=0.98)
