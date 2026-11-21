@@ -46,8 +46,8 @@ const WEATHER_OPTIONS: { id: WeatherMode; label: string }[] = [
 
 const QUALITY_OPTIONS: { id: QualityTier; label: string }[] = [
   { id: "smooth", label: "流畅" },
-  { id: "refined", label: "精致" },
-  { id: "cinematic", label: "光追" },
+  { id: "refined", label: "标准" },
+  { id: "cinematic", label: "极致画质" },
 ];
 
 function WeatherIcon({ mode, size = 13 }: { mode: WeatherMode; size?: number }) {

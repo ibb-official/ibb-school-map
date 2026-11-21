@@ -225,16 +225,15 @@ function injectWeatherSurfaceShader(
 }
 
 /**
- * Injects gentle wind sway & backlit leaf translucency into botanical foliage cards.
+ * Keeps botanical foliage cards completely stationary (zero spinning/twisting)
+ * while still supporting crisp winter snow accumulation on upper crown faces.
  */
 function injectFoliageShader(
   mat: THREE.MeshStandardMaterial,
   shared: GlobalShaderUniforms
 ): void {
-  mat.customProgramCacheKey = () => "campus_foliage_sway_v1";
+  mat.customProgramCacheKey = () => "campus_foliage_static_snow_v2";
   mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = shared.uTime;
-    shader.uniforms.uWindStrength = shared.uWindStrength;
     shader.uniforms.uSnow = shared.uSnow;
 
     shader.vertexShader = shader.vertexShader
@@ -242,23 +241,13 @@ function injectFoliageShader(
         "#include <common>",
         /* glsl */ `
         #include <common>
-        uniform float uTime;
-        uniform float uWindStrength;
-        varying vec3 vFoliageWorldPos;
         varying vec3 vFoliageWorldNorm;
         `
       )
       .replace(
-        "#include <begin_vertex>",
+        "#include <worldpos_vertex>",
         /* glsl */ `
-        #include <begin_vertex>
-        vec4 fwp = modelMatrix * vec4(transformed, 1.0);
-        float heightFactor = clamp((fwp.y - 1.2) * 0.14, 0.0, 1.2);
-        float phase = fwp.x * 0.45 + fwp.z * 0.37 + uTime * (1.35 + uWindStrength * 1.1);
-        float gust = sin(phase) * 0.065 + sin(phase * 2.13 + fwp.y) * 0.025;
-        transformed.x += gust * heightFactor * (0.4 + uWindStrength);
-        transformed.z += cos(phase * 0.87) * 0.045 * heightFactor * (0.4 + uWindStrength);
-        vFoliageWorldPos = fwp.xyz;
+        #include <worldpos_vertex>
         vFoliageWorldNorm = normalize(mat3(modelMatrix) * objectNormal);
         `
       );
@@ -269,7 +258,6 @@ function injectFoliageShader(
         /* glsl */ `
         #include <common>
         uniform float uSnow;
-        varying vec3 vFoliageWorldPos;
         varying vec3 vFoliageWorldNorm;
         `
       )
