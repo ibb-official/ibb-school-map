@@ -1,8 +1,12 @@
 import Link from "next/link";
 
-export function Footer() {
+interface FooterProps {
+  className?: string;
+}
+
+export function Footer({ className = "" }: FooterProps) {
   return (
-    <footer className="site-footer">
+    <footer className={`site-footer ${className}`.trim()}>
       <div className="site-footer-inner">
         <span>
           © 2026 ibb-official · 同学共建 · 地图数据 © OpenStreetMap contributors（ODbL）
