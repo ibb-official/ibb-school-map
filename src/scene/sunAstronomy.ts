@@ -215,7 +215,8 @@ export function computeSolarAtmosphere(
     .lerp(fogTwilight, twilightGlow * 0.88)
     .lerp(fogBlueHour, smoothstep(2.0, -5.0, sunElevationDeg) * 0.75)
     .lerp(fogDeepNight, smoothstep(-4.0, -11.0, sunElevationDeg));
-  let fogDensity = 0.00105 + twilightGlow * 0.00045 + nightFactor * 0.00055;
+  // Compact campus: zero distance fog in clear weather so buildings stay razor-sharp at any zoom
+  let fogDensity = 0.0;
 
   // Sky physical scattering + cloud styling
   let turbidity = 3.2 + twilightGlow * 7.8;
@@ -239,7 +240,7 @@ export function computeSolarAtmosphere(
     hemiIntensity *= 1.18;
     envIntensity *= 0.88;
     turbidity += 4.0;
-    fogDensity *= 1.45;
+    fogDensity = 0.00055;
     fogColor.lerp(new THREE.Color(isNight ? 0x141b29 : 0xbbc6d4), 0.52);
     cloudTint.lerp(new THREE.Color(isNight ? 0x1a2232 : 0xd0d8e2), 0.48);
     windStrength = 0.62;
@@ -250,7 +251,7 @@ export function computeSolarAtmosphere(
     hemiIntensity *= 1.05;
     envIntensity *= 0.95; // keep reflections crisp on wet asphalt & puddles
     turbidity += 6.0;
-    fogDensity = 0.0028 + nightFactor * 0.0008;
+    fogDensity = 0.0016 + nightFactor * 0.0005;
     fogColor.lerp(new THREE.Color(isNight ? 0x0d1524 : 0x7e8f9f), 0.72);
     cloudTint.lerp(new THREE.Color(isNight ? 0x141c2a : 0x8d9aa8), 0.68);
     windStrength = 1.15;
@@ -262,7 +263,7 @@ export function computeSolarAtmosphere(
     hemiIntensity *= 1.16;
     turbidity += 5.5;
     mieCoefficient += 0.025;
-    fogDensity = 0.0046;
+    fogDensity = 0.0032;
     fogColor.lerp(
       new THREE.Color(isNight ? 0x182236 : twilightGlow > 0.25 ? 0xe8b594 : 0xd5dfe8),
       0.66
@@ -276,7 +277,7 @@ export function computeSolarAtmosphere(
     hemiIntensity *= 1.32; // snow ground bounce makes winter scenes softly luminous
     hemiGroundColor.lerp(new THREE.Color(isNight ? 0x26344a : 0xdce6f2), 0.62);
     envIntensity *= 1.05;
-    fogDensity = 0.0030;
+    fogDensity = 0.0018;
     fogColor.lerp(new THREE.Color(isNight ? 0x162134 : 0xd8e2ee), 0.68);
     cloudTint.lerp(new THREE.Color(isNight ? 0x222f46 : 0xe4ecf4), 0.65);
     windStrength = 0.78;

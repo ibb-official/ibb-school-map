@@ -141,10 +141,13 @@ export function CampusScene3D({
     const width = Math.max(container.clientWidth, 320);
     const height = Math.max(container.clientHeight, 320);
     const initAtmo = atmosphereRef.current;
+    const rawDpr = window.devicePixelRatio || 1;
     const initDpr =
-      initAtmo.quality === "smooth"
-        ? Math.min(window.devicePixelRatio || 1, 1.5)
-        : Math.min(window.devicePixelRatio || 1, 2);
+      initAtmo.quality === "cinematic"
+        ? Math.min(Math.max(rawDpr, 1.75), 2.5)
+        : initAtmo.quality === "smooth"
+        ? Math.min(rawDpr, 1.25)
+        : Math.min(rawDpr, 2);
 
     renderer.setPixelRatio(initDpr);
     renderer.setSize(width, height);
@@ -170,9 +173,9 @@ export function CampusScene3D({
     const initSample = computeSolarAtmosphere(initAtmo.timeHours, initAtmo.weather);
     const fog = new THREE.FogExp2(initSample.fogColor.getHex(), initSample.fogDensity);
     scene.background = initSample.fogColor.clone();
-    scene.fog = fog;
+    scene.fog = initSample.fogDensity > 0.00001 ? fog : null;
 
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.45, 960);
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 1200);
     camera.position.set(...campus.defaultCameraPos);
 
     const controls = new MapControls(camera, renderer.domElement);
@@ -185,7 +188,7 @@ export function CampusScene3D({
     controls.maxPolarAngle = Math.PI / 2 - 0.015;
     controls.update();
 
-    // Subsystems: Atmospheric Sky + Dynamic PMREM IBL, PBR Material System, CSM & Night Lighting/Weather, Post-Processing, True PathTracer
+    // Subsystems: Atmospheric Sky + Dynamic PMREM IBL, PBR Material System, World-Locked Shadows & Lights, Post-Processing, True PathTracer
     const skySystem = new AtmosphereSkySystem(renderer);
     scene.add(skySystem.domeMesh);
     skySystem.update(
@@ -200,11 +203,12 @@ export function CampusScene3D({
     const campusLights = CAMPUS_LIGHTS[campus.id] ?? [];
     const lightingWeather = new LightingAndWeatherSystem(
       scene,
-      camera,
+      campus.id,
       campus.defaultCameraTarget,
       campusLights,
       initAtmo.quality
     );
+    lightingWeather.setQuality(initAtmo.quality, renderer.capabilities.maxTextureSize);
 
     // Subtle far-horizon ground apron that adapts seamlessly across sunset, night, rain & snow
     const horizonGeo = new THREE.CircleGeometry(480, 48);
@@ -214,7 +218,6 @@ export function CampusScene3D({
       roughness: 0.94,
       metalness: 0.0,
     });
-    lightingWeather.setupMaterialForCSM(horizonMat);
     const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
     horizonMesh.position.set(campus.defaultCameraTarget[0], -0.24, campus.defaultCameraTarget[2]);
     horizonMesh.receiveShadow = true;
@@ -230,6 +233,7 @@ export function CampusScene3D({
       initAtmo.quality
     );
     const pathTracer = new PathTracerController();
+    pathTracer.targetSamples = initAtmo.quality === "cinematic" ? 256 : 128;
 
     const nodeMeshes = new Map<string, THREE.Mesh[]>();
     const selectableMeshes: THREE.Mesh[] = [];
@@ -276,10 +280,7 @@ export function CampusScene3D({
         // 1. Upgrade materials (PBR, normal/ORM, foliage cards, physical glass, water, weather shaders)
         const buckets = pbrSystem.upgradeLoadedScene(loadedRoot);
 
-        // 2. Chain Cascaded Shadow Maps onto all upgraded PBR/weather materials
-        lightingWeather.setupMaterialsForCSM(loadedRoot);
-
-        // 3. Index selectable building nodes without cloning materials (non-destructive OutlineEffect!)
+        // 2. Index selectable building nodes without cloning materials (non-destructive OutlineEffect!)
         loadedRoot.traverse((obj) => {
           if (validPlaceIds.has(obj.name)) {
             const placeId = obj.name;
@@ -378,7 +379,6 @@ export function CampusScene3D({
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
         postPipeline.setSize(w, h);
-        lightingWeather.csm.updateFrustums();
         if (pathTracer.isActive()) {
           pathTracer.notifyCameraMoved();
         }
@@ -453,9 +453,14 @@ export function CampusScene3D({
       const currentHours = liveTimeHoursRef.current;
       const sample = computeSolarAtmosphere(currentHours, atmo.weather);
 
-      // Update distance fog & far horizon ground apron
-      fog.color.copy(sample.fogColor);
-      fog.density = sample.fogDensity;
+      // Update weather fog (zero distance fog in clear weather so compact campus stays sharp!)
+      if (sample.fogDensity > 0.00001) {
+        fog.color.copy(sample.fogColor);
+        fog.density = sample.fogDensity;
+        scene.fog = fog;
+      } else {
+        scene.fog = null;
+      }
       if (!isPT && scene.background instanceof THREE.Color) {
         scene.background.copy(sample.fogColor);
       }
@@ -471,7 +476,7 @@ export function CampusScene3D({
         skySystem.update(sample, WEATHER_DARKEN_MAP[atmo.weather], elapsedSec, scene, false);
       }
 
-      // Tick PBR weather uniforms (rain puddles, snow blanket, wind sway, animated water normals)
+      // Tick PBR weather uniforms (rain puddles, snow blanket, animated water normals)
       pbrSystem.tick(
         elapsedSec,
         sample.wetness,
@@ -481,12 +486,11 @@ export function CampusScene3D({
         handles?.buckets?.waterMaterials ?? []
       );
 
-      // Update Cascaded Shadow Maps, 7-bucket school interior lighting, floodlights, PointLight pool & particles
+      // Update world-locked shadows, 7-bucket school interior lighting, fixed campus lamps & particles
       lightingWeather.update(
         sample,
         currentHours,
         atmo.weather,
-        camera,
         handles?.buckets ?? null,
         dt,
         elapsedSec,
@@ -607,16 +611,21 @@ export function CampusScene3D({
     };
   }, [campus]);
 
-  // 2. Dynamic quality tier updates (N8AO / SSR / SSGI / DPR / PointLight budget)
+  // 2. Dynamic quality tier updates (Ultra 4K shadows, supersampled HiDPI, full-res N8AO, CAS sharpening)
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h) return;
     h.postPipeline.setQuality(atmosphere.quality);
-    h.lightingWeather.setQuality(atmosphere.quality);
+    h.lightingWeather.setQuality(atmosphere.quality, h.renderer.capabilities.maxTextureSize);
+    h.pathTracer.targetSamples = atmosphere.quality === "cinematic" ? 256 : 128;
+
+    const rawDpr = window.devicePixelRatio || 1;
     const targetDpr =
-      atmosphere.quality === "smooth"
-        ? Math.min(window.devicePixelRatio || 1, 1.5)
-        : Math.min(window.devicePixelRatio || 1, 2);
+      atmosphere.quality === "cinematic"
+        ? Math.min(Math.max(rawDpr, 1.75), 2.5)
+        : atmosphere.quality === "smooth"
+        ? Math.min(rawDpr, 1.25)
+        : Math.min(rawDpr, 2);
     h.renderer.setPixelRatio(targetDpr);
     const w = Math.max(hostRef.current?.clientWidth ?? 320, 200);
     const hPx = Math.max(hostRef.current?.clientHeight ?? 320, 200);
@@ -634,12 +643,10 @@ export function CampusScene3D({
       h.postPipeline.setHighlightedObjects([], "none");
       h.lightingWeather.setPathTracingMode(true);
       const sample = computeSolarAtmosphere(atmosphereRef.current.timeHours, atmosphereRef.current.weather);
-      // Force one immediate lighting update so interior emissives & pathTraceSunLight match before BVH sync
       h.lightingWeather.update(
         sample,
         atmosphereRef.current.timeHours,
         atmosphereRef.current.weather,
-        h.camera,
         h.buckets,
         0.016,
         0,
@@ -688,7 +695,6 @@ export function CampusScene3D({
       sample,
       atmosphere.timeHours,
       atmosphere.weather,
-      h.camera,
       h.buckets,
       0.016,
       0,

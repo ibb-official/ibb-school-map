@@ -31,6 +31,7 @@ import {
   PinIcon,
   ResetIcon,
   SearchIcon,
+  SparklesIcon,
 } from "./Icons";
 import { PlaceDetailDrawer } from "./PlaceDetailDrawer";
 
@@ -278,6 +279,24 @@ export function MapWorkspace() {
 
               {viewMode === "3d" && (
                 <>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={atmosphere.quality === "cinematic"}
+                    className={`tool-btn tool-btn-ultra ${
+                      atmosphere.quality === "cinematic" ? "tool-btn-ultra-active" : ""
+                    }`}
+                    onClick={() =>
+                      handleAtmosphereChange({
+                        quality: atmosphere.quality === "cinematic" ? "refined" : "cinematic",
+                      })
+                    }
+                    title="开启极致画质：4096 级校园全域阴影、超采样高分渲染、全分辨率精细环境光遮蔽与锐化增强"
+                  >
+                    <SparklesIcon size={14} />
+                    <span>{atmosphere.quality === "cinematic" ? "极致画质：开" : "极致画质"}</span>
+                  </button>
+
                   <button
                     type="button"
                     className={`tool-btn ${showPins ? "tool-btn-active" : ""}`}

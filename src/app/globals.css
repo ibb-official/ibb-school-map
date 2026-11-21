@@ -233,6 +233,31 @@ input {
   color: var(--bj166-navy);
 }
 
+.tool-btn-ultra {
+  border-color: rgba(180, 118, 22, 0.35);
+  color: #7c4a03;
+  background: linear-gradient(135deg, #fffdf7 0%, #fef7e4 100%);
+}
+
+.tool-btn-ultra:hover {
+  border-color: #d97706;
+  color: #92400e;
+  background: linear-gradient(135deg, #fef9e7 0%, #fdecc8 100%);
+}
+
+.tool-btn-ultra-active {
+  background: linear-gradient(135deg, #0b3f70 0%, #1c6cae 55%, #d97706 100%);
+  border-color: #d97706;
+  color: #ffffff;
+  box-shadow: 0 3px 12px rgba(21, 91, 150, 0.32);
+}
+
+.tool-btn-ultra-active:hover {
+  color: #ffffff;
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #09355e 0%, #155b96 55%, #b45309 100%);
+}
+
 /* Viewport Stage */
 .viewport-stage {
   position: relative;
