@@ -1,13 +1,21 @@
 "use client";
 
+import { useState } from "react";
+import { ActionButton } from "@react-spectrum/s2/ActionButton";
+import { Badge } from "@react-spectrum/s2/Badge";
+import { Button, Text } from "@react-spectrum/s2/Button";
+import { CloseButton } from "@react-spectrum/s2/CloseButton";
+import { Content, Dialog, DialogContainer, Heading } from "@react-spectrum/s2/Dialog";
+import { Divider } from "@react-spectrum/s2/Divider";
+import ChevronDown from "@react-spectrum/s2/icons/ChevronDown";
+import ChevronUp from "@react-spectrum/s2/icons/ChevronUp";
+import Location from "@react-spectrum/s2/icons/Location";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/data/places";
-import { CampusPlace, ViewMode } from "@/data/types";
-import { ChevronDownIcon, ChevronUpIcon, CloseIcon, CompassIcon } from "./Icons";
+import { CampusPlace, PhotoReference } from "@/data/types";
 import { MobileBottomSheet, SheetSnap } from "./MobileBottomSheet";
 
 interface PlaceDetailDrawerProps {
   place: CampusPlace;
-  viewMode: ViewMode;
   isMobileShell?: boolean;
   mobileSnap?: SheetSnap;
   onMobileSnapChange?: (next: SheetSnap) => void;
@@ -17,132 +25,82 @@ interface PlaceDetailDrawerProps {
 
 export function PlaceDetailDrawer({
   place,
-  viewMode,
   isMobileShell = false,
   mobileSnap = "peek",
   onMobileSnapChange,
   onClose,
   onFocus3D,
 }: PlaceDetailDrawerProps) {
-  const detailContent = (
-    <>
-      {viewMode === "3d" && (
-        <button
-          type="button"
-          className="detail-focus-btn"
-          onClick={() => {
-            onFocus3D(place);
-            if (isMobileShell && onMobileSnapChange) {
-              onMobileSnapChange("peek");
-            }
-          }}
-        >
-          <CompassIcon size={15} />
-          <span>飞至最佳 3D 观赏机位</span>
-        </button>
-      )}
+  const [lightboxPhoto, setLightboxPhoto] = useState<PhotoReference | null>(null);
 
-      <section style={{ marginBottom: "14px" }}>
-        <h3 style={{ margin: "0 0 6px", fontSize: "13px", color: "#0b3f70" }}>
-          建筑概览
-        </h3>
-        <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.65, color: "#1f2d3d" }}>
-          {place.summary}
-        </p>
+  const detailContent = (
+    <div className="detail-sections">
+      <Button
+        variant="accent"
+        size="M"
+        UNSAFE_style={{ width: "100%" }}
+        onPress={() => {
+          onFocus3D(place);
+          if (isMobileShell && onMobileSnapChange) {
+            onMobileSnapChange("peek");
+          }
+        }}
+      >
+        <Location />
+        <Text>飞至最佳 3D 观赏机位</Text>
+      </Button>
+
+      <section className="detail-section">
+        <h3 className="detail-section-title">建筑概览</h3>
+        <p className="detail-paragraph">{place.summary}</p>
       </section>
 
-      <section style={{ marginBottom: "14px" }}>
-        <h3 style={{ margin: "0 0 6px", fontSize: "13px", color: "#0b3f70" }}>
-          实景建模细节特征
-        </h3>
-        <ul
-          style={{
-            margin: 0,
-            paddingLeft: "18px",
-            fontSize: "12.5px",
-            lineHeight: 1.65,
-            color: "#334155",
-          }}
-        >
+      <Divider size="S" />
+
+      <section className="detail-section">
+        <h3 className="detail-section-title">实景建模特征</h3>
+        <ul className="detail-feature-list">
           {place.architecturalFeatures.map((feat, idx) => (
-            <li key={idx} style={{ marginBottom: "4px" }}>
-              {feat}
-            </li>
+            <li key={idx}>{feat}</li>
           ))}
         </ul>
       </section>
 
       {place.historicalNote && (
-        <section
-          style={{
-            marginBottom: "14px",
-            padding: "10px 12px",
-            borderRadius: "10px",
-            background: "#faf6ee",
-            border: "1px solid #e7dcc4",
-          }}
-        >
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#8a6d3b", marginBottom: "3px" }}>
-            校园人文脉络（公开文献）
-          </div>
-          <p style={{ margin: 0, fontSize: "12px", lineHeight: 1.55, color: "#5c4a28" }}>
-            {place.historicalNote}
-          </p>
+        <section className="detail-history-callout">
+          <div className="detail-history-title">校园人文脉络（公开文献）</div>
+          <p className="detail-history-text">{place.historicalNote}</p>
         </section>
       )}
 
-      <section>
-        <h3 style={{ margin: "0 0 8px", fontSize: "13px", color: "#0b3f70" }}>
-          真实摄影对照存档
-        </h3>
+      <Divider size="S" />
+
+      <section className="detail-section">
+        <h3 className="detail-section-title">真实摄影对照存档</h3>
         {place.photoRefs.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              padding: "10px 12px",
-              borderRadius: "10px",
-              background: "#f4f7fa",
-              fontSize: "12px",
-              color: "#64748b",
-            }}
-          >
+          <p className="detail-empty-photos">
             该点位三维形态与色彩已依据 OSM 实测矢量轮廓与 Zoom-19 航拍正射影像校准；公开地面摄影资料持续补充中。
           </p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div className="detail-photo-stack">
             {place.photoRefs.map((photo) => (
-              <figure
-                key={photo.src}
-                style={{
-                  margin: 0,
-                  borderRadius: "10px",
-                  border: "1px solid rgba(15, 39, 68, 0.12)",
-                  overflow: "hidden",
-                  background: "#f8fafc",
-                }}
-              >
-                <img
-                  src={photo.src}
-                  alt={photo.caption}
-                  loading="lazy"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    height: "auto",
-                    maxHeight: "200px",
-                    objectFit: "cover",
-                  }}
-                />
-                <figcaption
-                  style={{
-                    padding: "8px 10px",
-                    fontSize: "11.5px",
-                    lineHeight: 1.45,
-                    color: "#475569",
-                  }}
+              <figure key={photo.src} className="detail-photo-card">
+                <button
+                  type="button"
+                  className="detail-photo-trigger"
+                  onClick={() => setLightboxPhoto(photo)}
+                  aria-label={`放大查看照片：${photo.caption}`}
                 >
-                  <div style={{ fontWeight: 600, color: "#1e293b" }}>{photo.caption}</div>
-                  <div style={{ marginTop: "2px", color: "#64748b" }}>
+                  <img
+                    src={photo.src}
+                    alt={photo.caption}
+                    loading="lazy"
+                    className="detail-photo-img"
+                  />
+                </button>
+                <figcaption className="detail-photo-caption">
+                  <div className="detail-photo-title">{photo.caption}</div>
+                  <div className="detail-photo-meta">
                     拍摄年份：{photo.year} · 来源：{photo.sourceLabel}
                   </div>
                 </figcaption>
@@ -151,7 +109,27 @@ export function PlaceDetailDrawer({
           </div>
         )}
       </section>
-    </>
+    </div>
+  );
+
+  const photoLightbox = (
+    <DialogContainer onDismiss={() => setLightboxPhoto(null)}>
+      {lightboxPhoto && (
+        <Dialog isDismissible size="L">
+          <Heading slot="title">{lightboxPhoto.caption}</Heading>
+          <Content>
+            <img
+              src={lightboxPhoto.src}
+              alt={lightboxPhoto.caption}
+              className="lightbox-photo-img"
+            />
+            <p className="detail-photo-meta" style={{ marginTop: "10px" }}>
+              拍摄年份：{lightboxPhoto.year} · 来源：{lightboxPhoto.sourceLabel}
+            </p>
+          </Content>
+        </Dialog>
+      )}
+    </DialogContainer>
   );
 
   if (isMobileShell) {
@@ -163,140 +141,104 @@ export function PlaceDetailDrawer({
           className="place-sheet-title-area"
           onClick={() => onMobileSnapChange?.(isExpanded ? "peek" : "expanded")}
         >
-          <div className="place-sheet-badge-row">
+          <div className="place-badge-row">
             <span
               className="place-code-pill"
               style={{ backgroundColor: CATEGORY_COLORS[place.category] }}
             >
               {place.code}
             </span>
-            <span
-              className="place-sheet-cat"
-              style={{ color: CATEGORY_COLORS[place.category] }}
-            >
+            <Badge variant="neutral" fillStyle="subtle" size="S">
               {CATEGORY_LABELS[place.category]}
-            </span>
+            </Badge>
             {place.photoRefs.length > 0 && (
-              <span className="place-sheet-photo-tag">
+              <Badge variant="informative" fillStyle="subtle" size="S">
                 实拍 ×{place.photoRefs.length}
-              </span>
+              </Badge>
             )}
           </div>
-          <h2 className="place-sheet-name">{place.name}</h2>
-          <p className="place-sheet-sub">{place.storiesLabel}</p>
+          <h2 className="detail-place-name">{place.name}</h2>
+          <p className="detail-place-sub">{place.storiesLabel}</p>
         </div>
 
-        <div className="place-sheet-header-actions">
-          <button
-            type="button"
-            className="icon-close-btn mobile-touch-btn"
-            onClick={() => onMobileSnapChange?.(isExpanded ? "peek" : "expanded")}
-            aria-label={isExpanded ? "收起为摘要卡片" : "展开查看完整详情"}
+        <div className="place-sheet-actions">
+          <ActionButton
+            isQuiet
+            size="S"
+            onPress={() => onMobileSnapChange?.(isExpanded ? "peek" : "expanded")}
+            aria-label={isExpanded ? "收起为摘要" : "展开完整详情"}
           >
-            {isExpanded ? <ChevronDownIcon size={16} /> : <ChevronUpIcon size={16} />}
-          </button>
-          <button
-            type="button"
-            className="icon-close-btn mobile-touch-btn"
-            onClick={onClose}
-            aria-label="关闭建筑详情"
-          >
-            <CloseIcon size={16} />
-          </button>
+            {isExpanded ? <ChevronDown /> : <ChevronUp />}
+          </ActionButton>
+          <CloseButton size="S" onPress={onClose} />
         </div>
       </div>
     );
 
-    const peekActions = (
+    const peekContent = (
       <div className="place-peek-actions">
-        {viewMode === "3d" && (
-          <button
-            type="button"
-            className="place-peek-primary-btn"
-            onClick={() => onFocus3D(place)}
-          >
-            <CompassIcon size={15} />
-            <span>最佳 3D 视角</span>
-          </button>
-        )}
-        <button
-          type="button"
-          className="place-peek-expand-btn"
-          onClick={() => onMobileSnapChange?.("expanded")}
+        <Button variant="accent" size="M" onPress={() => onFocus3D(place)}>
+          <Location />
+          <Text>最佳 3D 视角</Text>
+        </Button>
+        <Button
+          variant="secondary"
+          fillStyle="outline"
+          size="M"
+          onPress={() => onMobileSnapChange?.("expanded")}
         >
-          <span>详情与实拍图</span>
-          <ChevronUpIcon size={14} />
-        </button>
+          详情与实拍图
+        </Button>
       </div>
     );
 
     return (
-      <MobileBottomSheet
-        open
-        onClose={onClose}
-        ariaLabel={`${place.name} 详情面板`}
-        variant="two-stage"
-        snap={mobileSnap}
-        onSnapChange={onMobileSnapChange}
-        theme="light"
-        modalBackdrop
-        header={sheetHeader}
-        peekContent={peekActions}
-        className="place-detail-mobile-sheet"
-      >
-        <div className="place-sheet-scroll-content">{detailContent}</div>
-      </MobileBottomSheet>
+      <>
+        <MobileBottomSheet
+          open
+          onClose={onClose}
+          ariaLabel={`${place.name} 详情面板`}
+          variant="two-stage"
+          snap={mobileSnap}
+          onSnapChange={onMobileSnapChange}
+          modalBackdrop
+          header={sheetHeader}
+          peekContent={peekContent}
+        >
+          <div className="detail-scroll-body">{detailContent}</div>
+        </MobileBottomSheet>
+        {photoLightbox}
+      </>
     );
   }
 
   return (
-    <aside className="detail-drawer" aria-label={`${place.name} 详情面板`}>
-      <div className="detail-header">
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <span
-              className="place-code-pill"
-              style={{ backgroundColor: CATEGORY_COLORS[place.category] }}
-            >
-              {place.code}
-            </span>
-            <span
-              style={{
-                fontSize: "11.5px",
-                fontWeight: 600,
-                color: CATEGORY_COLORS[place.category],
-              }}
-            >
-              {CATEGORY_LABELS[place.category]}
-            </span>
+    <>
+      <aside className="hud-drawer hud-drawer-right" aria-label={`${place.name} 详情面板`}>
+        <div className="detail-header">
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="place-badge-row">
+              <span
+                className="place-code-pill"
+                style={{ backgroundColor: CATEGORY_COLORS[place.category] }}
+              >
+                {place.code}
+              </span>
+              <Badge variant="neutral" fillStyle="subtle" size="S">
+                {CATEGORY_LABELS[place.category]}
+              </Badge>
+            </div>
+            <h2 className="detail-place-name">{place.name}</h2>
+            <p className="detail-place-sub">
+              {place.storiesLabel} · ENU ({place.enu[0].toFixed(1)}m, {place.enu[1].toFixed(1)}m)
+            </p>
           </div>
-          <h2
-            style={{
-              margin: "6px 0 2px",
-              fontSize: "16.5px",
-              lineHeight: 1.35,
-              color: "#0b3f70",
-            }}
-          >
-            {place.name}
-          </h2>
-          <p style={{ margin: 0, fontSize: "12px", color: "#516175" }}>
-            {place.storiesLabel} · ENU 相对坐标 ({place.enu[0].toFixed(1)}m,{" "}
-            {place.enu[1].toFixed(1)}m)
-          </p>
+          <CloseButton size="S" onPress={onClose} />
         </div>
 
-        <button
-          type="button"
-          className="icon-close-btn"
-          onClick={onClose}
-          aria-label="关闭建筑详情"
-        >
-          <CloseIcon size={15} />
-        </button>
-      </div>
-
-      <div className="detail-body">{detailContent}</div>
-    </aside>
+        <div className="detail-scroll-body">{detailContent}</div>
+      </aside>
+      {photoLightbox}
+    </>
   );
 }
