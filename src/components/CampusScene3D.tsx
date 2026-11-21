@@ -4,15 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MapControls } from "three/examples/jsm/controls/MapControls.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { CAMPUS_LIGHTS } from "@/data/campusLights";
 import { CATEGORY_COLORS } from "@/data/places";
-import { CampusMeta, CampusPlace, LightingPreset } from "@/data/types";
+import { AtmosphereState, CampusMeta, CampusPlace, WeatherMode } from "@/data/types";
+import { AtmosphereSkySystem } from "@/scene/atmosphereSky";
+import { LightingAndWeatherSystem } from "@/scene/lightingAndWeather";
+import { PathTracerController, PathTracerStatus } from "@/scene/pathTracerController";
+import { PBRMaterialSystem, UpgradedMaterialBuckets } from "@/scene/pbrMaterialSystem";
+import { PostProcessingPipeline } from "@/scene/postProcessingPipeline";
+import { computeSolarAtmosphere, formatTimeHours } from "@/scene/sunAstronomy";
+import { AtmosphereDock } from "./AtmosphereDock";
 
 interface CampusScene3DProps {
   campus: CampusMeta;
   places: CampusPlace[];
   selectedPlaceId: string | null;
-  lightingPreset: LightingPreset;
+  atmosphere: AtmosphereState;
   showPins: boolean;
   cameraFlightRequest: {
     id: number;
@@ -20,76 +27,35 @@ interface CampusScene3DProps {
     cameraTarget: [number, number, number];
   } | null;
   onSelectPlace: (placeId: string | null) => void;
+  onAtmosphereChange: (patch: Partial<AtmosphereState>) => void;
+  onSyncBeijingNow: () => void;
   onWebGLError: (message: string) => void;
 }
 
-interface ClonedMatRecord {
-  material: THREE.MeshStandardMaterial;
-  baseEmissive: THREE.Color;
-  baseEmissiveIntensity: number;
-}
+const WEATHER_DARKEN_MAP: Record<WeatherMode, number> = {
+  clear: 0.0,
+  cloudy: 0.45,
+  misty: 0.55,
+  snowy: 0.62,
+  rainy: 0.85,
+};
 
-const LIGHTING_CONFIGS: Record<
-  LightingPreset,
-  {
-    bg: number;
-    fogDensity: number;
-    sunPos: [number, number, number];
-    sunColor: number;
-    sunIntensity: number;
-    hemiSky: number;
-    hemiGround: number;
-    hemiIntensity: number;
-    envIntensity: number;
-    ledBoost: number;
-  }
-> = {
-  morning: {
-    bg: 0xdce9f7,
-    fogDensity: 0.0014,
-    sunPos: [95, 86, 62],
-    sunColor: 0xfff5e4,
-    sunIntensity: 2.15,
-    hemiSky: 0xdbeafe,
-    hemiGround: 0x9ca3af,
-    hemiIntensity: 0.65,
-    envIntensity: 0.72,
-    ledBoost: 1.0,
-  },
-  noon: {
-    bg: 0xd7e7f6,
-    fogDensity: 0.0011,
-    sunPos: [42, 132, 36],
-    sunColor: 0xffffff,
-    sunIntensity: 2.35,
-    hemiSky: 0xe0f2fe,
-    hemiGround: 0xa1a8b3,
-    hemiIntensity: 0.75,
-    envIntensity: 0.85,
-    ledBoost: 0.85,
-  },
-  sunset: {
-    bg: 0xe6d6cb,
-    fogDensity: 0.0017,
-    sunPos: [-96, 44, 72],
-    sunColor: 0xffc689,
-    sunIntensity: 2.05,
-    hemiSky: 0xfde6d2,
-    hemiGround: 0x6b7280,
-    hemiIntensity: 0.58,
-    envIntensity: 0.62,
-    ledBoost: 1.65,
-  },
+const INITIAL_PT_STATUS: PathTracerStatus = {
+  phase: "idle",
+  samples: 0,
+  targetSamples: 128,
 };
 
 export function CampusScene3D({
   campus,
   places,
   selectedPlaceId,
-  lightingPreset,
+  atmosphere,
   showPins,
   cameraFlightRequest,
   onSelectPlace,
+  onAtmosphereChange,
+  onSyncBeijingNow,
   onWebGLError,
 }: CampusScene3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -99,10 +65,14 @@ export function CampusScene3D({
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
+  const [pathTracerStatus, setPathTracerStatus] = useState<PathTracerStatus>(INITIAL_PT_STATUS);
 
   // Refs synced to imperative Three.js loop without restarting WebGL context
   const onSelectRef = useRef(onSelectPlace);
   onSelectRef.current = onSelectPlace;
+
+  const onAtmoChangeRef = useRef(onAtmosphereChange);
+  onAtmoChangeRef.current = onAtmosphereChange;
 
   const onErrorRef = useRef(onWebGLError);
   onErrorRef.current = onWebGLError;
@@ -110,31 +80,42 @@ export function CampusScene3D({
   const placesRef = useRef(places);
   placesRef.current = places;
 
-  const selectedRef = useRef(selectedPlaceId);
-  selectedRef.current = selectedPlaceId;
-
   const hoveredRef = useRef(hoveredPlaceId);
   hoveredRef.current = hoveredPlaceId;
 
   const showPinsRef = useRef(showPins);
   showPinsRef.current = showPins;
 
-  // Imperative scene handles for lighting updates, highlights & smooth flights
+  const atmosphereRef = useRef(atmosphere);
+  atmosphereRef.current = atmosphere;
+
+  const liveTimeHoursRef = useRef(atmosphere.timeHours);
+  if (!atmosphere.autoPlay) {
+    liveTimeHoursRef.current = atmosphere.timeHours;
+  }
+
+  // Imperative handles for dynamic atmosphere, highlights, path tracing & camera flights
   const sceneHandlesRef = useRef<{
+    renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
-    sunLight: THREE.DirectionalLight;
-    hemiLight: THREE.HemisphereLight;
     camera: THREE.PerspectiveCamera;
     controls: MapControls;
-    nodeMaterials: Map<string, ClonedMatRecord[]>;
-    ledMaterials: ClonedMatRecord[];
+    skySystem: AtmosphereSkySystem;
+    pbrSystem: PBRMaterialSystem;
+    lightingWeather: LightingAndWeatherSystem;
+    postPipeline: PostProcessingPipeline;
+    pathTracer: PathTracerController;
+    horizonMat: THREE.MeshStandardMaterial;
+    nodeMeshes: Map<string, THREE.Mesh[]>;
+    loadedRoot: THREE.Object3D | null;
+    buckets: UpgradedMaterialBuckets | null;
     flightGoal: {
       pos: THREE.Vector3;
       target: THREE.Vector3;
     } | null;
   } | null>(null);
 
-  // 1. Initialize Three.js WebGL2 engine + load GLB whenever campus changes
+  // 1. Initialize WebGL2 ArchViz engine + PBR/CSM/Sky/PostProcessing/PathTracer whenever campus switches
   useEffect(() => {
     const container = hostRef.current;
     if (!container) return;
@@ -143,12 +124,14 @@ export function CampusScene3D({
     setIsLoaded(false);
     setLoadProgress(5);
     setHoveredPlaceId(null);
+    setPathTracerStatus(INITIAL_PT_STATUS);
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: false, // Handled cleanly by EffectComposer MSAA + SMAA (and jittered AA in PathTracer)
         powerPreference: "high-performance",
+        preserveDrawingBuffer: true, // Enables crisp PNG export from GPU PathTracer
       });
     } catch {
       onErrorRef.current("当前浏览器或设备无法创建 WebGL 上下文，已切换为 2D 校园平面图。");
@@ -157,12 +140,18 @@ export function CampusScene3D({
 
     const width = Math.max(container.clientWidth, 320);
     const height = Math.max(container.clientHeight, 320);
+    const initAtmo = atmosphereRef.current;
+    const initDpr =
+      initAtmo.quality === "smooth"
+        ? Math.min(window.devicePixelRatio || 1, 1.5)
+        : Math.min(window.devicePixelRatio || 1, 2);
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(initDpr);
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    // EffectComposer applies AgX tone mapping; switch to ACESFilmic only while PathTracer draws directly
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -178,18 +167,12 @@ export function CampusScene3D({
     renderer.domElement.addEventListener("webglcontextlost", handleContextLost);
 
     const scene = new THREE.Scene();
-    const initialLight = LIGHTING_CONFIGS[lightingPreset];
-    scene.background = new THREE.Color(initialLight.bg);
-    scene.fog = new THREE.FogExp2(initialLight.bg, initialLight.fogDensity);
-    scene.environmentIntensity = initialLight.envIntensity;
+    const initSample = computeSolarAtmosphere(initAtmo.timeHours, initAtmo.weather);
+    const fog = new THREE.FogExp2(initSample.fogColor.getHex(), initSample.fogDensity);
+    scene.background = initSample.fogColor.clone();
+    scene.fog = fog;
 
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const roomEnv = new RoomEnvironment();
-    const envTarget = pmrem.fromScene(roomEnv, 0.04);
-    scene.environment = envTarget.texture;
-    roomEnv.dispose();
-
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 900);
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.45, 960);
     camera.position.set(...campus.defaultCameraPos);
 
     const controls = new MapControls(camera, renderer.domElement);
@@ -197,61 +180,75 @@ export function CampusScene3D({
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.screenSpacePanning = false;
-    controls.minDistance = 3.5;
+    controls.minDistance = 3.2;
     controls.maxDistance = 260;
     controls.maxPolarAngle = Math.PI / 2 - 0.015;
     controls.update();
 
-    const hemiLight = new THREE.HemisphereLight(
-      initialLight.hemiSky,
-      initialLight.hemiGround,
-      initialLight.hemiIntensity
+    // Subsystems: Atmospheric Sky + Dynamic PMREM IBL, PBR Material System, CSM & Night Lighting/Weather, Post-Processing, True PathTracer
+    const skySystem = new AtmosphereSkySystem(renderer);
+    scene.add(skySystem.domeMesh);
+    skySystem.update(
+      initSample,
+      WEATHER_DARKEN_MAP[initAtmo.weather],
+      0,
+      scene,
+      true
     );
-    scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(
-      initialLight.sunColor,
-      initialLight.sunIntensity
+    const pbrSystem = new PBRMaterialSystem(renderer);
+    const campusLights = CAMPUS_LIGHTS[campus.id] ?? [];
+    const lightingWeather = new LightingAndWeatherSystem(
+      scene,
+      camera,
+      campus.defaultCameraTarget,
+      campusLights,
+      initAtmo.quality
     );
-    sunLight.position.set(...initialLight.sunPos);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(2048, 2048);
-    sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 360;
-    sunLight.shadow.camera.left = -135;
-    sunLight.shadow.camera.right = 135;
-    sunLight.shadow.camera.top = 145;
-    sunLight.shadow.camera.bottom = -145;
-    sunLight.shadow.bias = -0.0005;
-    scene.add(sunLight);
 
-    // Subtle far-horizon matte apron beneath model so campus never floats in void
-    const horizonGeo = new THREE.CircleGeometry(460, 48);
+    // Subtle far-horizon ground apron that adapts seamlessly across sunset, night, rain & snow
+    const horizonGeo = new THREE.CircleGeometry(480, 48);
     horizonGeo.rotateX(-Math.PI / 2);
     const horizonMat = new THREE.MeshStandardMaterial({
-      color: 0xd1dae3,
-      roughness: 0.96,
-      metalness: 0,
+      color: initSample.hemiGroundColor.clone().lerp(initSample.fogColor, 0.52),
+      roughness: 0.94,
+      metalness: 0.0,
     });
+    lightingWeather.setupMaterialForCSM(horizonMat);
     const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
     horizonMesh.position.set(campus.defaultCameraTarget[0], -0.24, campus.defaultCameraTarget[2]);
     horizonMesh.receiveShadow = true;
     horizonMesh.name = "__horizon_apron";
     scene.add(horizonMesh);
 
-    const nodeMaterials = new Map<string, ClonedMatRecord[]>();
-    const ledMaterials: ClonedMatRecord[] = [];
+    const postPipeline = new PostProcessingPipeline(
+      renderer,
+      scene,
+      camera,
+      width,
+      height,
+      initAtmo.quality
+    );
+    const pathTracer = new PathTracerController();
+
+    const nodeMeshes = new Map<string, THREE.Mesh[]>();
     const selectableMeshes: THREE.Mesh[] = [];
     const validPlaceIds = new Set(placesRef.current.map((p) => p.meshNodeName));
 
     sceneHandlesRef.current = {
+      renderer,
       scene,
-      sunLight,
-      hemiLight,
       camera,
       controls,
-      nodeMaterials,
-      ledMaterials,
+      skySystem,
+      pbrSystem,
+      lightingWeather,
+      postPipeline,
+      pathTracer,
+      horizonMat,
+      nodeMeshes,
+      loadedRoot: null,
+      buckets: null,
       flightGoal: null,
     };
 
@@ -260,63 +257,50 @@ export function CampusScene3D({
         sceneHandlesRef.current.flightGoal = null;
       }
     };
+    const handleControlsChange = () => {
+      if (pathTracer.isActive()) {
+        pathTracer.notifyCameraMoved();
+      }
+    };
     controls.addEventListener("start", cancelFlight);
+    controls.addEventListener("change", handleControlsChange);
 
-    // Load GLB Model
+    // Load GLB Model & upgrade all materials to CC0 PBR + Sobel Normals + Physical Glass + CSM
     const loader = new GLTFLoader();
-    let loadedRoot: THREE.Object3D | null = null;
     loader.load(
       campus.modelUrl,
       (gltf) => {
         if (disposed) return;
-        loadedRoot = gltf.scene;
+        const loadedRoot = gltf.scene;
 
+        // 1. Upgrade materials (PBR, normal/ORM, foliage cards, physical glass, water, weather shaders)
+        const buckets = pbrSystem.upgradeLoadedScene(loadedRoot);
+
+        // 2. Chain Cascaded Shadow Maps onto all upgraded PBR/weather materials
+        lightingWeather.setupMaterialsForCSM(loadedRoot);
+
+        // 3. Index selectable building nodes without cloning materials (non-destructive OutlineEffect!)
         loadedRoot.traverse((obj) => {
-          // Top-level building/campus node names are attached either on obj or ancestor
           if (validPlaceIds.has(obj.name)) {
             const placeId = obj.name;
-            const clonedForNode: ClonedMatRecord[] = [];
+            const meshesForNode: THREE.Mesh[] = [];
             obj.traverse((child) => {
               if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
                 mesh.userData.placeId = placeId;
                 selectableMeshes.push(mesh);
-
-                const cloneOne = (m: THREE.Material): THREE.Material => {
-                  if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-                    const cloned = (m as THREE.MeshStandardMaterial).clone();
-                    const rec: ClonedMatRecord = {
-                      material: cloned,
-                      baseEmissive: cloned.emissive.clone(),
-                      baseEmissiveIntensity: cloned.emissiveIntensity,
-                    };
-                    clonedForNode.push(rec);
-                    if (cloned.name === "Mat_LED" || cloned.name === "Mat_StageLED") {
-                      ledMaterials.push(rec);
-                    }
-                    return cloned;
-                  }
-                  return m;
-                };
-
-                if (Array.isArray(mesh.material)) {
-                  mesh.material = mesh.material.map(cloneOne);
-                } else if (mesh.material) {
-                  mesh.material = cloneOne(mesh.material);
-                }
+                meshesForNode.push(mesh);
               }
             });
-            nodeMaterials.set(placeId, clonedForNode);
-          } else if ((obj as THREE.Mesh).isMesh && !obj.userData.placeId) {
-            const mesh = obj as THREE.Mesh;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            nodeMeshes.set(placeId, meshesForNode);
           }
         });
 
         scene.add(loadedRoot);
+        if (sceneHandlesRef.current) {
+          sceneHandlesRef.current.loadedRoot = loadedRoot;
+          sceneHandlesRef.current.buckets = buckets;
+        }
         setLoadProgress(100);
         setIsLoaded(true);
       },
@@ -361,6 +345,10 @@ export function CampusScene3D({
     };
 
     const handlePointerMove = (ev: PointerEvent) => {
+      if (pathTracer.isActive()) {
+        renderer.domElement.style.cursor = "grab";
+        return;
+      }
       const hit = getHitPlaceId(ev.clientX, ev.clientY);
       renderer.domElement.style.cursor = hit ? "pointer" : "grab";
       if (hit !== hoveredRef.current) {
@@ -389,6 +377,11 @@ export function CampusScene3D({
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
+        postPipeline.setSize(w, h);
+        lightingWeather.csm.updateFrustums();
+        if (pathTracer.isActive()) {
+          pathTracer.notifyCameraMoved();
+        }
       }
     });
     ro.observe(container);
@@ -396,14 +389,35 @@ export function CampusScene3D({
     // Render loop + direct DOM projection for floating 3D pins
     const clock = new THREE.Clock();
     const projVec = new THREE.Vector3();
+    const snowTint = new THREE.Color(0xeef4fa);
+    let elapsedSec = 0;
+    let lastAutoPlaySyncMs = 0;
+    let lastPtSamplesReported = -1;
     let rafId = 0;
 
     const animate = () => {
       if (disposed) return;
       rafId = window.requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.05);
+      elapsedSec += dt;
 
       const handles = sceneHandlesRef.current;
+      const atmo = atmosphereRef.current;
+      const isPT = pathTracer.isActive();
+
+      // Advance continuous timelapse cleanly at 60fps when autoPlay is enabled
+      if (atmo.autoPlay && !isPT) {
+        liveTimeHoursRef.current = (liveTimeHoursRef.current + dt * 1.15) % 24;
+        const nowMs = performance.now();
+        if (nowMs - lastAutoPlaySyncMs > 120) {
+          lastAutoPlaySyncMs = nowMs;
+          onAtmoChangeRef.current({ timeHours: liveTimeHoursRef.current });
+        }
+      } else {
+        liveTimeHoursRef.current = atmo.timeHours;
+      }
+
+      // Smooth fly-to transitions
       if (handles?.flightGoal) {
         const alpha = 1 - Math.exp(-5.4 * dt);
         camera.position.lerp(handles.flightGoal.pos, alpha);
@@ -415,6 +429,9 @@ export function CampusScene3D({
           camera.position.copy(handles.flightGoal.pos);
           controls.target.copy(handles.flightGoal.target);
           handles.flightGoal = null;
+        }
+        if (isPT) {
+          pathTracer.notifyCameraMoved();
         }
       }
 
@@ -430,10 +447,72 @@ export function CampusScene3D({
         campus.panBounds.maxZ
       );
       controls.target.y = THREE.MathUtils.clamp(controls.target.y, -1, 24);
-
       controls.update();
-      renderer.render(scene, camera);
 
+      // Compute physical Beijing solar & multi-weather atmosphere
+      const currentHours = liveTimeHoursRef.current;
+      const sample = computeSolarAtmosphere(currentHours, atmo.weather);
+
+      // Update distance fog & far horizon ground apron
+      fog.color.copy(sample.fogColor);
+      fog.density = sample.fogDensity;
+      if (!isPT && scene.background instanceof THREE.Color) {
+        scene.background.copy(sample.fogColor);
+      }
+      horizonMat.color
+        .copy(sample.hemiGroundColor)
+        .lerp(sample.fogColor, 0.52)
+        .lerp(snowTint, sample.snowCoverage * 0.82);
+      horizonMat.roughness = THREE.MathUtils.lerp(0.95, 0.24, sample.wetness * 0.65);
+
+      // Keep atmospheric sky dome centered on camera so horizon never clips
+      skySystem.domeMesh.position.copy(camera.position);
+      if (!isPT) {
+        skySystem.update(sample, WEATHER_DARKEN_MAP[atmo.weather], elapsedSec, scene, false);
+      }
+
+      // Tick PBR weather uniforms (rain puddles, snow blanket, wind sway, animated water normals)
+      pbrSystem.tick(
+        elapsedSec,
+        sample.wetness,
+        sample.snowCoverage,
+        sample.windStrength,
+        sample.nightFactor,
+        handles?.buckets?.waterMaterials ?? []
+      );
+
+      // Update Cascaded Shadow Maps, 7-bucket school interior lighting, floodlights, PointLight pool & particles
+      lightingWeather.update(
+        sample,
+        currentHours,
+        atmo.weather,
+        camera,
+        handles?.buckets ?? null,
+        dt,
+        elapsedSec,
+        isPT
+      );
+
+      // Render Track B (True GPU Path Tracing) or Track A (Real-time N8AO + SSR/SSGI + Bloom + AgX + SMAA)
+      if (isPT) {
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = sample.exposure * 0.92;
+        const samples = pathTracer.renderFrame();
+        if (samples !== lastPtSamplesReported) {
+          lastPtSamplesReported = samples;
+          setPathTracerStatus({
+            phase: "rendering",
+            samples,
+            targetSamples: pathTracer.targetSamples,
+          });
+        }
+      } else {
+        renderer.toneMapping = THREE.NoToneMapping;
+        postPipeline.updateFrame(sample.wetness, sample.nightFactor, sample.twilightGlow);
+        postPipeline.render(dt);
+      }
+
+      // Live compass heading
       const compassDialEl = compassDialRef.current;
       if (compassDialEl) {
         const vdx = controls.target.x - camera.position.x;
@@ -480,11 +559,25 @@ export function CampusScene3D({
       window.cancelAnimationFrame(rafId);
       ro.disconnect();
       controls.removeEventListener("start", cancelFlight);
+      controls.removeEventListener("change", handleControlsChange);
       controls.dispose();
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
       renderer.domElement.removeEventListener("webglcontextlost", handleContextLost);
+
+      pathTracer.deactivate(scene);
+      pathTracer.dispose();
+      postPipeline.dispose();
+      lightingWeather.dispose();
+      skySystem.dispose();
+
+      const buckets = sceneHandlesRef.current?.buckets;
+      if (buckets) {
+        for (const t of buckets.disposables.textures) t.dispose();
+        for (const m of buckets.disposables.materials) m.dispose();
+      }
+      pbrSystem.dispose();
 
       const disposedTextures = new Set<THREE.Texture>();
       scene.traverse((obj) => {
@@ -495,71 +588,133 @@ export function CampusScene3D({
           for (const mat of mats) {
             if (!mat) continue;
             const std = mat as THREE.MeshStandardMaterial;
-            if (std.map && !disposedTextures.has(std.map)) {
-              disposedTextures.add(std.map);
-              std.map.dispose();
+            for (const tex of [std.map, std.normalMap, std.roughnessMap, std.metalnessMap, std.aoMap]) {
+              if (tex && !disposedTextures.has(tex)) {
+                disposedTextures.add(tex);
+                tex.dispose();
+              }
             }
             mat.dispose();
           }
         }
       });
 
-      envTarget.dispose();
-      pmrem.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
       }
       sceneHandlesRef.current = null;
     };
-    // Intentionally re-initialize WebGL scene only when active campus switches
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campus]);
 
-  // 2. Dynamic lighting preset updates without reloading the 3D model
+  // 2. Dynamic quality tier updates (N8AO / SSR / SSGI / DPR / PointLight budget)
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h) return;
-    const cfg = LIGHTING_CONFIGS[lightingPreset];
-    h.scene.background = new THREE.Color(cfg.bg);
-    h.scene.fog = new THREE.FogExp2(cfg.bg, cfg.fogDensity);
-    h.scene.environmentIntensity = cfg.envIntensity;
-    h.sunLight.position.set(...cfg.sunPos);
-    h.sunLight.color.setHex(cfg.sunColor);
-    h.sunLight.intensity = cfg.sunIntensity;
-    h.hemiLight.color.setHex(cfg.hemiSky);
-    h.hemiLight.groundColor.setHex(cfg.hemiGround);
-    h.hemiLight.intensity = cfg.hemiIntensity;
+    h.postPipeline.setQuality(atmosphere.quality);
+    h.lightingWeather.setQuality(atmosphere.quality);
+    const targetDpr =
+      atmosphere.quality === "smooth"
+        ? Math.min(window.devicePixelRatio || 1, 1.5)
+        : Math.min(window.devicePixelRatio || 1, 2);
+    h.renderer.setPixelRatio(targetDpr);
+    const w = Math.max(hostRef.current?.clientWidth ?? 320, 200);
+    const hPx = Math.max(hostRef.current?.clientHeight ?? 320, 200);
+    h.renderer.setSize(w, hPx);
+    h.postPipeline.setSize(w, hPx);
+  }, [atmosphere.quality]);
 
-    for (const rec of h.ledMaterials) {
-      rec.baseEmissiveIntensity = cfg.ledBoost;
-      rec.material.emissiveIntensity = cfg.ledBoost;
-    }
-  }, [lightingPreset]);
-
-  // 3. Apply per-node warm emissive tint when selected or hovered
+  // 3. True GPU Path Tracing activation / deactivation lifecycle
   useEffect(() => {
     const h = sceneHandlesRef.current;
-    if (!h) return;
-    for (const [nodeId, records] of h.nodeMaterials.entries()) {
-      const isSelected = nodeId === selectedPlaceId;
-      const isHovered = nodeId === hoveredPlaceId;
-      for (const rec of records) {
-        if (isSelected) {
-          rec.material.emissive.setHex(0xc26d18);
-          rec.material.emissiveIntensity = 0.28;
-        } else if (isHovered) {
-          rec.material.emissive.setHex(0x1c6cae);
-          rec.material.emissiveIntensity = 0.2;
-        } else {
-          rec.material.emissive.copy(rec.baseEmissive);
-          rec.material.emissiveIntensity = rec.baseEmissiveIntensity;
-        }
-      }
-    }
-  }, [selectedPlaceId, hoveredPlaceId, isLoaded]);
+    if (!h || !isLoaded || !h.loadedRoot) return;
+    let cancelled = false;
 
-  // 4. Trigger smooth fly-to camera transition on tour stop or building focus
+    if (atmosphere.pathTracingActive) {
+      h.postPipeline.setHighlightedObjects([], "none");
+      h.lightingWeather.setPathTracingMode(true);
+      const sample = computeSolarAtmosphere(atmosphereRef.current.timeHours, atmosphereRef.current.weather);
+      // Force one immediate lighting update so interior emissives & pathTraceSunLight match before BVH sync
+      h.lightingWeather.update(
+        sample,
+        atmosphereRef.current.timeHours,
+        atmosphereRef.current.weather,
+        h.camera,
+        h.buckets,
+        0.016,
+        0,
+        true
+      );
+      void h.pathTracer
+        .activate(
+          h.renderer,
+          h.scene,
+          h.camera,
+          h.loadedRoot,
+          h.skySystem.domeMesh,
+          sample,
+          (status) => {
+            if (!cancelled) setPathTracerStatus(status);
+          }
+        )
+        .then((ok) => {
+          if (cancelled) return;
+          if (!ok) {
+            h.lightingWeather.setPathTracingMode(false);
+            h.renderer.toneMapping = THREE.NoToneMapping;
+            onAtmoChangeRef.current({ pathTracingActive: false });
+          }
+        });
+    } else if (h.pathTracer.isActive()) {
+      h.pathTracer.deactivate(h.scene);
+      h.lightingWeather.setPathTracingMode(false);
+      h.renderer.toneMapping = THREE.NoToneMapping;
+      const sample = computeSolarAtmosphere(atmosphereRef.current.timeHours, atmosphereRef.current.weather);
+      h.skySystem.update(sample, WEATHER_DARKEN_MAP[atmosphereRef.current.weather], 0, h.scene, true);
+      setPathTracerStatus(INITIAL_PT_STATUS);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [atmosphere.pathTracingActive, isLoaded]);
+
+  // 4. Sync Path Tracer environment & interior lights live if user adjusts time/weather during Path Tracing
+  useEffect(() => {
+    const h = sceneHandlesRef.current;
+    if (!h || !h.pathTracer.isActive()) return;
+    const sample = computeSolarAtmosphere(atmosphere.timeHours, atmosphere.weather);
+    h.lightingWeather.update(
+      sample,
+      atmosphere.timeHours,
+      atmosphere.weather,
+      h.camera,
+      h.buckets,
+      0.016,
+      0,
+      true
+    );
+    h.pathTracer.syncEnvironmentAndLights(h.scene, sample);
+  }, [atmosphere.timeHours, atmosphere.weather]);
+
+  // 5. Non-destructive selection / hover OutlineEffect (preserves PBR materials, glass & night windows!)
+  useEffect(() => {
+    const h = sceneHandlesRef.current;
+    if (!h || !isLoaded) return;
+    if (atmosphere.pathTracingActive) {
+      h.postPipeline.setHighlightedObjects([], "none");
+      return;
+    }
+    if (selectedPlaceId) {
+      h.postPipeline.setHighlightedObjects(h.nodeMeshes.get(selectedPlaceId) ?? [], "selected");
+    } else if (hoveredPlaceId) {
+      h.postPipeline.setHighlightedObjects(h.nodeMeshes.get(hoveredPlaceId) ?? [], "hovered");
+    } else {
+      h.postPipeline.setHighlightedObjects([], "none");
+    }
+  }, [selectedPlaceId, hoveredPlaceId, isLoaded, atmosphere.pathTracingActive]);
+
+  // 6. Trigger smooth fly-to camera transition on tour stop or building focus
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h || !cameraFlightRequest) return;
@@ -581,6 +736,16 @@ export function CampusScene3D({
       pos: new THREE.Vector3(controls.target.x, camY, controls.target.z + horizDist),
       target: controls.target.clone(),
     };
+  };
+
+  const handleExportPhoto = () => {
+    const h = sceneHandlesRef.current;
+    if (!h) return;
+    const timeTag = formatTimeHours(atmosphere.timeHours).replace(":", "");
+    h.pathTracer.downloadSnapshot(
+      h.renderer,
+      `bj166-${campus.id}-pathtraced-${timeTag}-${atmosphere.weather}.png`
+    );
   };
 
   return (
@@ -620,7 +785,19 @@ export function CampusScene3D({
         <span className="compass-sublabel">回正北向</span>
       </button>
 
-      {showPins && isLoaded && (
+      {/* Floating Atmospheric Lighting, 24h Solar Time, Weather & GPU Path Tracing Dock */}
+      {isLoaded && (
+        <AtmosphereDock
+          state={atmosphere}
+          pathTracerStatus={pathTracerStatus}
+          shifted={Boolean(selectedPlaceId)}
+          onChange={onAtmosphereChange}
+          onSyncBeijingNow={onSyncBeijingNow}
+          onExportPhoto={handleExportPhoto}
+        />
+      )}
+
+      {showPins && isLoaded && !atmosphere.pathTracingActive && (
         <div className="pins-overlay-layer" aria-label="三维空间点位标签层">
           {places.map((place) => {
             const selected = place.id === selectedPlaceId;
@@ -653,10 +830,10 @@ export function CampusScene3D({
       {!isLoaded && (
         <div className="scene-status-hud" role="status" aria-live="polite">
           <div style={{ fontSize: "14px", fontWeight: 700 }}>
-            正在加载 {campus.shortName} 精细 3D 校园模型...
+            正在加载 {campus.shortName} 写实 PBR 3D 校园模型...
           </div>
           <div style={{ fontSize: "12px", opacity: 0.85, marginTop: "4px" }}>
-            含砖墙材质、窗框凹进、门额文字牌匾 ({loadProgress}%)
+            含 CC0 法线贴图、物理透视玻璃、浅层室内灯光与实时光追 ({loadProgress}%)
           </div>
           <div className="progress-track">
             <div className="progress-fill" style={{ width: `${loadProgress}%` }} />
@@ -665,7 +842,7 @@ export function CampusScene3D({
       )}
 
       <div className="controls-hint-pill">
-        左键拖拽平移 · 右键/双指旋转 · 滚轮缩放 · 点击建筑查看照片档案
+        左键拖拽平移 · 右键/双指旋转 · 滚轮缩放 · 右上角调节时间/天气/真光追
       </div>
     </>
   );

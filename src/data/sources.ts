@@ -53,4 +53,13 @@ export const DATA_SOURCES: DataSourceEntry[] = [
       "西校区室外弧形坡道（雪松与红色花箱）、B/C/D座红色书本牌匾、校园百草园开敞花园、无车棚自行车停放区与音乐长廊空间功能校核",
     licenseOrNote: "用于校园公共空间与建筑细节对照。",
   },
+  {
+    id: "src-polyhaven-pbr",
+    category: "开源实拍 PBR 材质贴图库",
+    name: "Poly Haven（物理扫描建筑与自然 PBR 贴图：砖墙/石材/灰泥/瓦片/沥青/草木）",
+    coverage:
+      "用于三维校园建筑立面青砖、红砖、拉毛灰泥、玉纹大理石、花岗岩地砖、深灰板岩、筒瓦屋面、沥青路面、塑胶颗粒、草坪、树皮与花岗岩巨石的法线/粗糙度/环境光遮蔽微表面质感重建（经实景照片校色与 WebP 压缩）",
+    licenseOrNote: "CC0 1.0 Public Domain（公共领域开放素材）",
+    url: "https://polyhaven.com/textures",
+  },
 ];
