@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MapControls } from "three/examples/jsm/controls/MapControls.js";
 import { CAMPUS_LIGHTS } from "@/data/campusLights";
 import { CATEGORY_COLORS } from "@/data/places";
-import { AtmosphereState, CampusMeta, CampusPlace, WeatherMode } from "@/data/types";
+import {
+  AtmosphereState,
+  CampusMeta,
+  CampusPlace,
+  PlaceCategory,
+  QualityTier,
+  WeatherMode,
+} from "@/data/types";
 import { AtmosphereSkySystem } from "@/scene/atmosphereSky";
+import { detectDeviceProfile, DeviceProfile } from "@/scene/deviceProfile";
 import { LightingAndWeatherSystem } from "@/scene/lightingAndWeather";
 import { PathTracerController, PathTracerStatus } from "@/scene/pathTracerController";
 import { PBRMaterialSystem, UpgradedMaterialBuckets } from "@/scene/pbrMaterialSystem";
@@ -15,12 +24,20 @@ import { PostProcessingPipeline } from "@/scene/postProcessingPipeline";
 import { computeSolarAtmosphere, formatTimeHours } from "@/scene/sunAstronomy";
 import { AtmosphereDock } from "./AtmosphereDock";
 
+export type TouchNavMode = "rotate" | "pan";
+
 interface CampusScene3DProps {
   campus: CampusMeta;
   places: CampusPlace[];
   selectedPlaceId: string | null;
   atmosphere: AtmosphereState;
+  userSelectedQuality: boolean;
   showPins: boolean;
+  touchNavMode: TouchNavMode;
+  isMobileShell: boolean;
+  mobileCompassDialRef?: React.RefObject<HTMLDivElement | null>;
+  alignNorthRef?: React.MutableRefObject<(() => void) | null>;
+  exportPhotoRef?: React.MutableRefObject<(() => void) | null>;
   cameraFlightRequest: {
     id: number;
     cameraPos: [number, number, number];
@@ -29,6 +46,8 @@ interface CampusScene3DProps {
   onSelectPlace: (placeId: string | null) => void;
   onAtmosphereChange: (patch: Partial<AtmosphereState>) => void;
   onSyncBeijingNow: () => void;
+  onPathTracerStatusChange?: (status: PathTracerStatus) => void;
+  onLoadedChange?: (loaded: boolean) => void;
   onWebGLError: (message: string) => void;
 }
 
@@ -46,26 +65,78 @@ const INITIAL_PT_STATUS: PathTracerStatus = {
   targetSamples: 128,
 };
 
+const PIN_CATEGORY_PRIORITY: Record<PlaceCategory, number> = {
+  gate: 0,
+  heritage: 1,
+  sports: 2,
+  corridor: 3,
+  academic: 4,
+};
+
+const TOUCH_HINT_SESSION_KEY = "bj166-map-touch-hint-seen";
+
+/**
+ * Compensates vertical FOV on portrait viewports so the horizontal framing
+ * stays wide enough to show the whole campus without clipping east/west wings.
+ */
+function computeAdaptiveFov(width: number, height: number): number {
+  const aspect = width / Math.max(height, 1);
+  if (aspect >= 0.85) return 42;
+  const baseHalfTan = Math.tan(THREE.MathUtils.degToRad(21));
+  const clampedAspect = Math.max(aspect, 0.5);
+  const adaptedRad = 2 * Math.atan((baseHalfTan / clampedAspect) * 0.78);
+  return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(adaptedRad), 42, 62);
+}
+
+function computeTargetDpr(quality: QualityTier, profile: DeviceProfile): number {
+  const rawDpr = window.devicePixelRatio || 1;
+  if (profile.isMobileTier) {
+    if (quality === "cinematic") return Math.min(rawDpr, 1.75);
+    return Math.min(rawDpr, profile.recommendedDprCap);
+  }
+  if (quality === "cinematic") return Math.min(Math.max(rawDpr, 1.75), 2.5);
+  if (quality === "smooth") return Math.min(rawDpr, 1.25);
+  return Math.min(rawDpr, 2);
+}
+
+function applyTouchControlsMode(controls: MapControls, mode: TouchNavMode): void {
+  controls.touches =
+    mode === "rotate"
+      ? { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
+      : { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+}
+
 export function CampusScene3D({
   campus,
   places,
   selectedPlaceId,
   atmosphere,
+  userSelectedQuality,
   showPins,
+  touchNavMode,
+  isMobileShell,
+  mobileCompassDialRef,
+  alignNorthRef,
+  exportPhotoRef,
   cameraFlightRequest,
   onSelectPlace,
   onAtmosphereChange,
   onSyncBeijingNow,
+  onPathTracerStatusChange,
+  onLoadedChange,
   onWebGLError,
 }: CampusScene3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const pinElsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
   const compassDialRef = useRef<HTMLDivElement | null>(null);
+  const profileRef = useRef<DeviceProfile | null>(null);
+  const appliedQualityRef = useRef<QualityTier>(atmosphere.quality);
 
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [pathTracerStatus, setPathTracerStatus] = useState<PathTracerStatus>(INITIAL_PT_STATUS);
+  const [showTouchHint, setShowTouchHint] = useState<boolean>(false);
 
   // Refs synced to imperative Three.js loop without restarting WebGL context
   const onSelectRef = useRef(onSelectPlace);
@@ -77,8 +148,17 @@ export function CampusScene3D({
   const onErrorRef = useRef(onWebGLError);
   onErrorRef.current = onWebGLError;
 
+  const onPtStatusRef = useRef(onPathTracerStatusChange);
+  onPtStatusRef.current = onPathTracerStatusChange;
+
+  const onLoadedChangeRef = useRef(onLoadedChange);
+  onLoadedChangeRef.current = onLoadedChange;
+
   const placesRef = useRef(places);
   placesRef.current = places;
+
+  const selectedPlaceIdRef = useRef(selectedPlaceId);
+  selectedPlaceIdRef.current = selectedPlaceId;
 
   const hoveredRef = useRef(hoveredPlaceId);
   hoveredRef.current = hoveredPlaceId;
@@ -89,10 +169,27 @@ export function CampusScene3D({
   const atmosphereRef = useRef(atmosphere);
   atmosphereRef.current = atmosphere;
 
+  const userSelectedQualityRef = useRef(userSelectedQuality);
+  userSelectedQualityRef.current = userSelectedQuality;
+
+  const touchNavModeRef = useRef<TouchNavMode>(touchNavMode);
+  touchNavModeRef.current = touchNavMode;
+
+  const isMobileShellRef = useRef<boolean>(isMobileShell);
+  isMobileShellRef.current = isMobileShell;
+
+  const mobileCompassRef = useRef(mobileCompassDialRef);
+  mobileCompassRef.current = mobileCompassDialRef;
+
   const liveTimeHoursRef = useRef(atmosphere.timeHours);
   if (!atmosphere.autoPlay) {
     liveTimeHoursRef.current = atmosphere.timeHours;
   }
+
+  const updatePathTracerStatus = useCallback((status: PathTracerStatus) => {
+    setPathTracerStatus(status);
+    onPtStatusRef.current?.(status);
+  }, []);
 
   // Imperative handles for dynamic atmosphere, highlights, path tracing & camera flights
   const sceneHandlesRef = useRef<{
@@ -115,23 +212,85 @@ export function CampusScene3D({
     } | null;
   } | null>(null);
 
-  // 1. Initialize WebGL2 ArchViz engine + PBR/CSM/Sky/PostProcessing/PathTracer whenever campus switches
+  const handleAlignNorth = useCallback(() => {
+    const h = sceneHandlesRef.current;
+    if (!h) return;
+    const { camera, controls } = h;
+    const dx = camera.position.x - controls.target.x;
+    const dz = camera.position.z - controls.target.z;
+    const horizDist = Math.max(Math.hypot(dx, dz), 12);
+    const camY = Math.max(camera.position.y, controls.target.y + 8);
+    h.flightGoal = {
+      pos: new THREE.Vector3(controls.target.x, camY, controls.target.z + horizDist),
+      target: controls.target.clone(),
+    };
+  }, []);
+
+  const handleExportPhoto = useCallback(() => {
+    const h = sceneHandlesRef.current;
+    if (!h) return;
+    const atmo = atmosphereRef.current;
+    const timeTag = formatTimeHours(atmo.timeHours).replace(":", "");
+    h.pathTracer.downloadSnapshot(
+      h.renderer,
+      `bj166-${campus.id}-pathtraced-${timeTag}-${atmo.weather}.png`
+    );
+  }, [campus.id]);
+
+  // Register imperative actions for mobile action rail / bottom sheet
+  useEffect(() => {
+    if (alignNorthRef) alignNorthRef.current = handleAlignNorth;
+    if (exportPhotoRef) exportPhotoRef.current = handleExportPhoto;
+    return () => {
+      if (alignNorthRef) alignNorthRef.current = null;
+      if (exportPhotoRef) exportPhotoRef.current = null;
+    };
+  }, [alignNorthRef, exportPhotoRef, handleAlignNorth, handleExportPhoto]);
+
+  // Brief first-time touch gesture guide on mobile once 3D scene finishes loading
+  useEffect(() => {
+    if (!isLoaded || !isMobileShell) return;
+    try {
+      if (window.sessionStorage.getItem(TOUCH_HINT_SESSION_KEY)) return;
+      window.sessionStorage.setItem(TOUCH_HINT_SESSION_KEY, "1");
+    } catch {
+      // Ignore storage access restrictions
+    }
+    setShowTouchHint(true);
+    const timer = window.setTimeout(() => setShowTouchHint(false), 3800);
+    return () => window.clearTimeout(timer);
+  }, [isLoaded, isMobileShell]);
+
+  // 1. Initialize WebGL2 ArchViz engine + PBR/World-Locked Shadows/Sky/PostProcessing/PathTracer
   useEffect(() => {
     const container = hostRef.current;
     if (!container) return;
 
     let disposed = false;
     setIsLoaded(false);
+    onLoadedChangeRef.current?.(false);
     setLoadProgress(5);
     setHoveredPlaceId(null);
-    setPathTracerStatus(INITIAL_PT_STATUS);
+    updatePathTracerStatus(INITIAL_PT_STATUS);
+
+    // Synchronously probe mobile capabilities BEFORE allocating WebGL/MSAA/shadow buffers
+    const profile = detectDeviceProfile();
+    profileRef.current = profile;
+
+    const initAtmo = atmosphereRef.current;
+    const effectiveInitQuality: QualityTier =
+      profile.isMobileTier && !userSelectedQualityRef.current
+        ? "smooth"
+        : initAtmo.quality;
+    appliedQualityRef.current = effectiveInitQuality;
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
-        antialias: false, // Handled cleanly by EffectComposer MSAA + SMAA (and jittered AA in PathTracer)
+        antialias: false, // Handled cleanly by EffectComposer hardware MSAA (and jittered AA in PathTracer)
         powerPreference: "high-performance",
-        preserveDrawingBuffer: true, // Enables crisp PNG export from GPU PathTracer
+        // Disable persistent drawing buffer on mobile Tile-GPUs for higher FPS & lower battery draw
+        preserveDrawingBuffer: !profile.isMobileTier,
       });
     } catch {
       onErrorRef.current("当前浏览器或设备无法创建 WebGL 上下文，已切换为 2D 校园平面图。");
@@ -140,14 +299,7 @@ export function CampusScene3D({
 
     const width = Math.max(container.clientWidth, 320);
     const height = Math.max(container.clientHeight, 320);
-    const initAtmo = atmosphereRef.current;
-    const rawDpr = window.devicePixelRatio || 1;
-    const initDpr =
-      initAtmo.quality === "cinematic"
-        ? Math.min(Math.max(rawDpr, 1.75), 2.5)
-        : initAtmo.quality === "smooth"
-        ? Math.min(rawDpr, 1.25)
-        : Math.min(rawDpr, 2);
+    const initDpr = computeTargetDpr(effectiveInitQuality, profile);
 
     renderer.setPixelRatio(initDpr);
     renderer.setSize(width, height);
@@ -157,6 +309,7 @@ export function CampusScene3D({
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.style.touchAction = "none";
 
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
@@ -175,17 +328,31 @@ export function CampusScene3D({
     scene.background = initSample.fogColor.clone();
     scene.fog = initSample.fogDensity > 0.00001 ? fog : null;
 
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 1200);
+    const camera = new THREE.PerspectiveCamera(
+      computeAdaptiveFov(width, height),
+      width / height,
+      0.5,
+      1200
+    );
     camera.position.set(...campus.defaultCameraPos);
 
     const controls = new MapControls(camera, renderer.domElement);
     controls.target.set(...campus.defaultCameraTarget);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+    controls.dampingFactor = profile.isCoarsePointer ? 0.1 : 0.08;
     controls.screenSpacePanning = false;
     controls.minDistance = 3.2;
     controls.maxDistance = 260;
-    controls.maxPolarAngle = Math.PI / 2 - 0.015;
+    controls.minPolarAngle = profile.isCoarsePointer ? 0.14 : 0;
+    controls.maxPolarAngle = profile.isCoarsePointer
+      ? Math.PI / 2 - 0.04
+      : Math.PI / 2 - 0.015;
+    if (profile.isCoarsePointer || profile.isMobileTier) {
+      controls.rotateSpeed = 0.72;
+      controls.panSpeed = 0.85;
+      controls.zoomSpeed = 0.9;
+      applyTouchControlsMode(controls, touchNavModeRef.current);
+    }
     controls.update();
 
     // Subsystems: Atmospheric Sky + Dynamic PMREM IBL, PBR Material System, World-Locked Shadows & Lights, Post-Processing, True PathTracer
@@ -199,16 +366,20 @@ export function CampusScene3D({
       true
     );
 
-    const pbrSystem = new PBRMaterialSystem(renderer);
+    const pbrSystem = new PBRMaterialSystem(renderer, profile.maxAnisotropyCap);
     const campusLights = CAMPUS_LIGHTS[campus.id] ?? [];
     const lightingWeather = new LightingAndWeatherSystem(
       scene,
       campus.id,
       campus.defaultCameraTarget,
       campusLights,
-      initAtmo.quality
+      effectiveInitQuality
     );
-    lightingWeather.setQuality(initAtmo.quality, renderer.capabilities.maxTextureSize);
+    const maxShadowTex = Math.min(
+      renderer.capabilities.maxTextureSize,
+      profile.maxShadowMapSize
+    );
+    lightingWeather.setQuality(effectiveInitQuality, maxShadowTex);
 
     // Subtle far-horizon ground apron that adapts seamlessly across sunset, night, rain & snow
     const horizonGeo = new THREE.CircleGeometry(480, 48);
@@ -230,10 +401,15 @@ export function CampusScene3D({
       camera,
       width,
       height,
-      initAtmo.quality
+      effectiveInitQuality,
+      profile.isMobileTier
     );
     const pathTracer = new PathTracerController();
-    pathTracer.targetSamples = initAtmo.quality === "cinematic" ? 256 : 128;
+    pathTracer.targetSamples = profile.isMobileTier
+      ? 64
+      : effectiveInitQuality === "cinematic"
+        ? 256
+        : 128;
 
     const nodeMeshes = new Map<string, THREE.Mesh[]>();
     const selectableMeshes: THREE.Mesh[] = [];
@@ -269,7 +445,7 @@ export function CampusScene3D({
     controls.addEventListener("start", cancelFlight);
     controls.addEventListener("change", handleControlsChange);
 
-    // Load GLB Model & upgrade all materials to CC0 PBR + Sobel Normals + Physical Glass + CSM
+    // Load GLB Model & upgrade all materials to CC0 PBR + Sobel Normals + Physical Glass
     const loader = new GLTFLoader();
     loader.load(
       campus.modelUrl,
@@ -304,6 +480,7 @@ export function CampusScene3D({
         }
         setLoadProgress(100);
         setIsLoaded(true);
+        onLoadedChangeRef.current?.(true);
       },
       (evt) => {
         if (disposed) return;
@@ -320,11 +497,15 @@ export function CampusScene3D({
       }
     );
 
-    // Pointer picking (hover + click vs drag)
+    // Multi-touch-safe pointer picking (ignores pinch/rotate; skips expensive raycasts on touch move)
     const raycaster = new THREE.Raycaster();
     const pointerNdc = new THREE.Vector2();
+    const activePointers = new Set<number>();
+    let primaryPointerId: number | null = null;
     let downX = 0;
     let downY = 0;
+    let downTime = 0;
+    let hadMultiTouch = false;
 
     const getHitPlaceId = (clientX: number, clientY: number): string | null => {
       if (selectableMeshes.length === 0) return null;
@@ -341,11 +522,21 @@ export function CampusScene3D({
     };
 
     const handlePointerDown = (ev: PointerEvent) => {
-      downX = ev.clientX;
-      downY = ev.clientY;
+      activePointers.add(ev.pointerId);
+      if (activePointers.size === 1) {
+        primaryPointerId = ev.pointerId;
+        downX = ev.clientX;
+        downY = ev.clientY;
+        downTime = performance.now();
+        hadMultiTouch = false;
+      } else {
+        hadMultiTouch = true;
+        primaryPointerId = null;
+      }
     };
 
     const handlePointerMove = (ev: PointerEvent) => {
+      if (ev.pointerType !== "mouse") return;
       if (pathTracer.isActive()) {
         renderer.domElement.style.cursor = "grab";
         return;
@@ -358,24 +549,48 @@ export function CampusScene3D({
     };
 
     const handlePointerUp = (ev: PointerEvent) => {
+      activePointers.delete(ev.pointerId);
+      const isCleanTap =
+        !hadMultiTouch &&
+        primaryPointerId === ev.pointerId &&
+        activePointers.size === 0;
+      if (activePointers.size === 0) {
+        primaryPointerId = null;
+        hadMultiTouch = false;
+      }
+      if (!isCleanTap) return;
+
       const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY);
-      if (dist >= 6) return;
+      const elapsed = performance.now() - downTime;
+      const maxTapDist = ev.pointerType === "touch" ? 12 : 6;
+      if (dist >= maxTapDist || (ev.pointerType === "touch" && elapsed > 380)) return;
+
       const hit = getHitPlaceId(ev.clientX, ev.clientY);
       if (hit) {
         onSelectRef.current(hit);
       }
     };
 
+    const handlePointerCancel = (ev: PointerEvent) => {
+      activePointers.delete(ev.pointerId);
+      if (activePointers.size === 0) {
+        primaryPointerId = null;
+        hadMultiTouch = false;
+      }
+    };
+
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
     renderer.domElement.addEventListener("pointerup", handlePointerUp);
+    renderer.domElement.addEventListener("pointercancel", handlePointerCancel);
 
-    // ResizeObserver for crisp layout across split drawers & mobile screens
+    // ResizeObserver for crisp HiDPI layout & portrait FOV compensation across rotations & drawers
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const w = Math.max(entry.contentRect.width, 200);
         const h = Math.max(entry.contentRect.height, 200);
         camera.aspect = w / h;
+        camera.fov = computeAdaptiveFov(w, h);
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
         postPipeline.setSize(w, h);
@@ -386,7 +601,7 @@ export function CampusScene3D({
     });
     ro.observe(container);
 
-    // Render loop + direct DOM projection for floating 3D pins
+    // Render loop + direct DOM projection with mobile screen-space collision culling
     const clock = new THREE.Clock();
     const projVec = new THREE.Vector3();
     const snowTint = new THREE.Color(0xeef4fa);
@@ -395,8 +610,13 @@ export function CampusScene3D({
     let lastPtSamplesReported = -1;
     let rafId = 0;
 
+    const acceptedPinBoxes: { x0: number; y0: number; x1: number; y1: number }[] = [];
+
     const animate = () => {
-      if (disposed) return;
+      if (disposed || document.hidden) {
+        rafId = 0;
+        return;
+      }
       rafId = window.requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.05);
       elapsedSec += dt;
@@ -405,7 +625,6 @@ export function CampusScene3D({
       const atmo = atmosphereRef.current;
       const isPT = pathTracer.isActive();
 
-      // Advance continuous timelapse cleanly at 60fps when autoPlay is enabled
       if (atmo.autoPlay && !isPT) {
         liveTimeHoursRef.current = (liveTimeHoursRef.current + dt * 1.15) % 24;
         const nowMs = performance.now();
@@ -417,7 +636,6 @@ export function CampusScene3D({
         liveTimeHoursRef.current = atmo.timeHours;
       }
 
-      // Smooth fly-to transitions
       if (handles?.flightGoal) {
         const alpha = 1 - Math.exp(-5.4 * dt);
         camera.position.lerp(handles.flightGoal.pos, alpha);
@@ -435,7 +653,6 @@ export function CampusScene3D({
         }
       }
 
-      // Clamp target within calibrated ENU pan envelope so camera never gets lost
       controls.target.x = THREE.MathUtils.clamp(
         controls.target.x,
         campus.panBounds.minX,
@@ -449,7 +666,6 @@ export function CampusScene3D({
       controls.target.y = THREE.MathUtils.clamp(controls.target.y, -1, 24);
       controls.update();
 
-      // Compute physical Beijing solar & multi-weather atmosphere
       const currentHours = liveTimeHoursRef.current;
       const sample = computeSolarAtmosphere(currentHours, atmo.weather);
 
@@ -470,7 +686,6 @@ export function CampusScene3D({
         .lerp(snowTint, sample.snowCoverage * 0.82);
       horizonMat.roughness = THREE.MathUtils.lerp(0.95, 0.24, sample.wetness * 0.65);
 
-      // Keep atmospheric sky dome centered on camera so horizon never clips
       skySystem.domeMesh.position.copy(camera.position);
       if (!isPT) {
         skySystem.update(sample, WEATHER_DARKEN_MAP[atmo.weather], elapsedSec, scene, false);
@@ -497,14 +712,13 @@ export function CampusScene3D({
         isPT
       );
 
-      // Render Track B (True GPU Path Tracing) or Track A (Real-time N8AO + SSR/SSGI + Bloom + AgX + SMAA)
       if (isPT) {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = sample.exposure * 0.92;
         const samples = pathTracer.renderFrame();
         if (samples !== lastPtSamplesReported) {
           lastPtSamplesReported = samples;
-          setPathTracerStatus({
+          updatePathTracerStatus({
             phase: "rendering",
             samples,
             targetSamples: pathTracer.targetSamples,
@@ -516,14 +730,17 @@ export function CampusScene3D({
         postPipeline.render(dt);
       }
 
-      // Live compass heading
-      const compassDialEl = compassDialRef.current;
-      if (compassDialEl) {
-        const vdx = controls.target.x - camera.position.x;
-        const vdz = controls.target.z - camera.position.z;
-        if (Math.hypot(vdx, vdz) > 0.05) {
-          const rotDeg = (Math.atan2(-vdx, -vdz) * 180) / Math.PI;
-          compassDialEl.style.setProperty("--compass-rot", `${rotDeg.toFixed(1)}deg`);
+      // Live compass heading (syncs both desktop & mobile dials with zero React re-renders)
+      const vdx = controls.target.x - camera.position.x;
+      const vdz = controls.target.z - camera.position.z;
+      if (Math.hypot(vdx, vdz) > 0.05) {
+        const rotCss = `${((Math.atan2(-vdx, -vdz) * 180) / Math.PI).toFixed(1)}deg`;
+        if (compassDialRef.current) {
+          compassDialRef.current.style.setProperty("--compass-rot", rotCss);
+        }
+        const mDial = mobileCompassRef.current?.current;
+        if (mDial) {
+          mDial.style.setProperty("--compass-rot", rotCss);
         }
       }
 
@@ -531,36 +748,122 @@ export function CampusScene3D({
       const cw = renderer.domElement.clientWidth;
       const ch = renderer.domElement.clientHeight;
       if (showPinsRef.current) {
-        for (const place of placesRef.current) {
-          const el = pinElsRef.current.get(place.id);
-          if (!el) continue;
-          projVec.set(place.position[0], place.position[1], place.position[2]);
-          projVec.project(camera);
-          if (projVec.z > 1 || projVec.z < -1) {
-            el.style.opacity = "0";
-            el.style.pointerEvents = "none";
-            continue;
+        const cullOverlap = isMobileShellRef.current || cw <= 860;
+        const currentSelectedId = selectedPlaceIdRef.current;
+
+        if (!cullOverlap) {
+          for (const place of placesRef.current) {
+            const el = pinElsRef.current.get(place.id);
+            if (!el) continue;
+            projVec.set(place.position[0], place.position[1], place.position[2]);
+            projVec.project(camera);
+            if (projVec.z > 1 || projVec.z < -1) {
+              el.style.opacity = "0";
+              el.style.pointerEvents = "none";
+              continue;
+            }
+            const sx = (projVec.x * 0.5 + 0.5) * cw;
+            const sy = (-projVec.y * 0.5 + 0.5) * ch;
+            if (sx < -40 || sx > cw + 40 || sy < -40 || sy > ch + 40) {
+              el.style.opacity = "0";
+              el.style.pointerEvents = "none";
+              continue;
+            }
+            el.style.opacity = "1";
+            el.style.pointerEvents = "auto";
+            el.style.left = `${sx.toFixed(1)}px`;
+            el.style.top = `${sy.toFixed(1)}px`;
           }
-          const sx = (projVec.x * 0.5 + 0.5) * cw;
-          const sy = (-projVec.y * 0.5 + 0.5) * ch;
-          if (sx < -40 || sx > cw + 40 || sy < -40 || sy > ch + 40) {
-            el.style.opacity = "0";
-            el.style.pointerEvents = "none";
-            continue;
+        } else {
+          // Mobile screen-space collision culling: keep selected & key landmarks visible,
+          // automatically reveal secondary labels as the user pinches closer!
+          acceptedPinBoxes.length = 0;
+          const safeRightEdge = cw - 62;
+          const safeBottomEdge = ch - 76;
+          const orderedPlaces = [...placesRef.current].sort((a, b) => {
+            if (a.id === currentSelectedId) return -1;
+            if (b.id === currentSelectedId) return 1;
+            return PIN_CATEGORY_PRIORITY[a.category] - PIN_CATEGORY_PRIORITY[b.category];
+          });
+
+          for (const place of orderedPlaces) {
+            const el = pinElsRef.current.get(place.id);
+            if (!el) continue;
+            projVec.set(place.position[0], place.position[1], place.position[2]);
+            projVec.project(camera);
+            if (projVec.z > 1 || projVec.z < -1) {
+              el.style.opacity = "0";
+              el.style.pointerEvents = "none";
+              continue;
+            }
+            const sx = (projVec.x * 0.5 + 0.5) * cw;
+            const sy = (-projVec.y * 0.5 + 0.5) * ch;
+            const isSel = place.id === currentSelectedId;
+
+            const estW = Math.min(126, 28 + place.shortName.length * 11.5) + 10;
+            const estH = 34;
+            const x0 = sx - estW * 0.5;
+            const x1 = sx + estW * 0.5;
+            const y0 = sy - estH;
+            const y1 = sy + 4;
+
+            if (
+              isSel
+                ? sx < 14 || sx > cw - 14 || sy < 26 || sy > ch - 24
+                : x0 < 8 || x1 > safeRightEdge || y0 < 10 || y1 > safeBottomEdge
+            ) {
+              el.style.opacity = "0";
+              el.style.pointerEvents = "none";
+              continue;
+            }
+
+            let collides = false;
+            if (!isSel) {
+              for (let i = 0; i < acceptedPinBoxes.length; i++) {
+                const b = acceptedPinBoxes[i];
+                if (x0 < b.x1 && x1 > b.x0 && y0 < b.y1 && y1 > b.y0) {
+                  collides = true;
+                  break;
+                }
+              }
+            }
+
+            if (collides) {
+              el.style.opacity = "0";
+              el.style.pointerEvents = "none";
+              continue;
+            }
+
+            acceptedPinBoxes.push({ x0, y0, x1, y1 });
+            el.style.opacity = "1";
+            el.style.pointerEvents = "auto";
+            el.style.left = `${sx.toFixed(1)}px`;
+            el.style.top = `${sy.toFixed(1)}px`;
           }
-          el.style.opacity = "1";
-          el.style.pointerEvents = "auto";
-          el.style.left = `${sx.toFixed(1)}px`;
-          el.style.top = `${sy.toFixed(1)}px`;
         }
       }
     };
+
+    const handleVisibilityChange = () => {
+      if (disposed) return;
+      if (document.hidden) {
+        if (rafId) {
+          window.cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      } else if (!rafId) {
+        clock.getDelta();
+        rafId = window.requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     rafId = window.requestAnimationFrame(animate);
 
     return () => {
       disposed = true;
-      window.cancelAnimationFrame(rafId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (rafId) window.cancelAnimationFrame(rafId);
       ro.disconnect();
       controls.removeEventListener("start", cancelFlight);
       controls.removeEventListener("change", handleControlsChange);
@@ -568,6 +871,7 @@ export function CampusScene3D({
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
+      renderer.domElement.removeEventListener("pointercancel", handlePointerCancel);
       renderer.domElement.removeEventListener("webglcontextlost", handleContextLost);
 
       pathTracer.deactivate(scene);
@@ -609,23 +913,39 @@ export function CampusScene3D({
       }
       sceneHandlesRef.current = null;
     };
-  }, [campus]);
+  }, [campus, updatePathTracerStatus]);
 
-  // 2. Dynamic quality tier updates (Ultra 4K shadows, supersampled HiDPI, full-res N8AO, CAS sharpening)
+  // 2. Live touch navigation mode toggle (single-finger Rotate vs Pan) without WebGL reload
   useEffect(() => {
     const h = sceneHandlesRef.current;
-    if (!h) return;
-    h.postPipeline.setQuality(atmosphere.quality);
-    h.lightingWeather.setQuality(atmosphere.quality, h.renderer.capabilities.maxTextureSize);
-    h.pathTracer.targetSamples = atmosphere.quality === "cinematic" ? 256 : 128;
+    const profile = profileRef.current;
+    if (!h || !profile) return;
+    if (profile.isCoarsePointer || profile.isMobileTier) {
+      applyTouchControlsMode(h.controls, touchNavMode);
+    }
+  }, [touchNavMode]);
 
-    const rawDpr = window.devicePixelRatio || 1;
-    const targetDpr =
-      atmosphere.quality === "cinematic"
-        ? Math.min(Math.max(rawDpr, 1.75), 2.5)
-        : atmosphere.quality === "smooth"
-        ? Math.min(rawDpr, 1.25)
-        : Math.min(rawDpr, 2);
+  // 3. Dynamic quality tier updates (Ultra 4K shadows, supersampled HiDPI, full-res N8AO, CAS sharpening)
+  useEffect(() => {
+    const h = sceneHandlesRef.current;
+    const profile = profileRef.current;
+    if (!h || !profile) return;
+    if (appliedQualityRef.current === atmosphere.quality) return;
+    appliedQualityRef.current = atmosphere.quality;
+
+    h.postPipeline.setQuality(atmosphere.quality);
+    const maxShadowTex = Math.min(
+      h.renderer.capabilities.maxTextureSize,
+      profile.maxShadowMapSize
+    );
+    h.lightingWeather.setQuality(atmosphere.quality, maxShadowTex);
+    h.pathTracer.targetSamples = profile.isMobileTier
+      ? 64
+      : atmosphere.quality === "cinematic"
+        ? 256
+        : 128;
+
+    const targetDpr = computeTargetDpr(atmosphere.quality, profile);
     h.renderer.setPixelRatio(targetDpr);
     const w = Math.max(hostRef.current?.clientWidth ?? 320, 200);
     const hPx = Math.max(hostRef.current?.clientHeight ?? 320, 200);
@@ -633,7 +953,7 @@ export function CampusScene3D({
     h.postPipeline.setSize(w, hPx);
   }, [atmosphere.quality]);
 
-  // 3. True GPU Path Tracing activation / deactivation lifecycle
+  // 4. True GPU Path Tracing activation / deactivation lifecycle (mobile-safe parameters when on phone)
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h || !isLoaded || !h.loadedRoot) return;
@@ -652,6 +972,7 @@ export function CampusScene3D({
         0,
         true
       );
+      const mobileSafe = Boolean(profileRef.current?.isMobileTier);
       void h.pathTracer
         .activate(
           h.renderer,
@@ -661,8 +982,9 @@ export function CampusScene3D({
           h.skySystem.domeMesh,
           sample,
           (status) => {
-            if (!cancelled) setPathTracerStatus(status);
-          }
+            if (!cancelled) updatePathTracerStatus(status);
+          },
+          mobileSafe
         )
         .then((ok) => {
           if (cancelled) return;
@@ -678,15 +1000,15 @@ export function CampusScene3D({
       h.renderer.toneMapping = THREE.NoToneMapping;
       const sample = computeSolarAtmosphere(atmosphereRef.current.timeHours, atmosphereRef.current.weather);
       h.skySystem.update(sample, WEATHER_DARKEN_MAP[atmosphereRef.current.weather], 0, h.scene, true);
-      setPathTracerStatus(INITIAL_PT_STATUS);
+      updatePathTracerStatus(INITIAL_PT_STATUS);
     }
 
     return () => {
       cancelled = true;
     };
-  }, [atmosphere.pathTracingActive, isLoaded]);
+  }, [atmosphere.pathTracingActive, isLoaded, updatePathTracerStatus]);
 
-  // 4. Sync Path Tracer environment & interior lights live if user adjusts time/weather during Path Tracing
+  // 5. Sync Path Tracer environment & interior lights live if user adjusts time/weather during Path Tracing
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h || !h.pathTracer.isActive()) return;
@@ -703,7 +1025,7 @@ export function CampusScene3D({
     h.pathTracer.syncEnvironmentAndLights(h.scene, sample);
   }, [atmosphere.timeHours, atmosphere.weather]);
 
-  // 5. Non-destructive selection / hover OutlineEffect (preserves PBR materials, glass & night windows!)
+  // 6. Non-destructive selection / hover OutlineEffect (preserves PBR materials, glass & night windows!)
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h || !isLoaded) return;
@@ -720,7 +1042,7 @@ export function CampusScene3D({
     }
   }, [selectedPlaceId, hoveredPlaceId, isLoaded, atmosphere.pathTracingActive]);
 
-  // 6. Trigger smooth fly-to camera transition on tour stop or building focus
+  // 7. Trigger smooth fly-to camera transition on tour stop or building focus
   useEffect(() => {
     const h = sceneHandlesRef.current;
     if (!h || !cameraFlightRequest) return;
@@ -730,30 +1052,6 @@ export function CampusScene3D({
     };
   }, [cameraFlightRequest]);
 
-  const handleAlignNorth = () => {
-    const h = sceneHandlesRef.current;
-    if (!h) return;
-    const { camera, controls } = h;
-    const dx = camera.position.x - controls.target.x;
-    const dz = camera.position.z - controls.target.z;
-    const horizDist = Math.max(Math.hypot(dx, dz), 12);
-    const camY = Math.max(camera.position.y, controls.target.y + 8);
-    h.flightGoal = {
-      pos: new THREE.Vector3(controls.target.x, camY, controls.target.z + horizDist),
-      target: controls.target.clone(),
-    };
-  };
-
-  const handleExportPhoto = () => {
-    const h = sceneHandlesRef.current;
-    if (!h) return;
-    const timeTag = formatTimeHours(atmosphere.timeHours).replace(":", "");
-    h.pathTracer.downloadSnapshot(
-      h.renderer,
-      `bj166-${campus.id}-pathtraced-${timeTag}-${atmosphere.weather}.png`
-    );
-  };
-
   return (
     <>
       <div
@@ -762,7 +1060,7 @@ export function CampusScene3D({
         aria-label={`${campus.name} 三维交互画布`}
       />
 
-      {/* Interactive live 3D directional compass (click to align camera due North) */}
+      {/* Desktop interactive live 3D directional compass (mobile uses compact compass in action rail) */}
       <button
         type="button"
         className={`compass-3d-widget${selectedPlaceId ? " compass-3d-widget-shifted" : ""}`}
@@ -791,12 +1089,13 @@ export function CampusScene3D({
         <span className="compass-sublabel">回正北向</span>
       </button>
 
-      {/* Floating Atmospheric Lighting, 24h Solar Time, Weather & GPU Path Tracing Dock */}
-      {isLoaded && (
+      {/* Desktop Floating Atmospheric Dock (mobile opens AtmosphereDock inside bottom sheet) */}
+      {isLoaded && !isMobileShell && (
         <AtmosphereDock
           state={atmosphere}
           pathTracerStatus={pathTracerStatus}
           shifted={Boolean(selectedPlaceId)}
+          variant="floating"
           onChange={onAtmosphereChange}
           onSyncBeijingNow={onSyncBeijingNow}
           onExportPhoto={handleExportPhoto}
@@ -839,12 +1138,25 @@ export function CampusScene3D({
             正在加载 {campus.shortName} 写实 PBR 3D 校园模型...
           </div>
           <div style={{ fontSize: "12px", opacity: 0.85, marginTop: "4px" }}>
-            含 CC0 法线贴图、物理透视玻璃、浅层室内灯光与实时光追 ({loadProgress}%)
+            含 CC0 法线贴图、物理透视玻璃与昼夜实时光影 ({loadProgress}%)
           </div>
           <div className="progress-track">
             <div className="progress-fill" style={{ width: `${loadProgress}%` }} />
           </div>
         </div>
+      )}
+
+      {showTouchHint && isMobileShell && (
+        <button
+          type="button"
+          className="mobile-touch-hint-toast"
+          onClick={() => setShowTouchHint(false)}
+          aria-label="关闭触屏手势提示"
+        >
+          {touchNavMode === "rotate"
+            ? "单指旋转视角 · 双指缩放平移 · 点击建筑看详情"
+            : "单指平移地图 · 双指缩放旋转 · 点击建筑看详情"}
+        </button>
       )}
 
       <div className="controls-hint-pill">

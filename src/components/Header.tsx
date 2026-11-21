@@ -1,13 +1,18 @@
 import Link from "next/link";
+import type React from "react";
 import { CompassIcon, ExternalIcon } from "./Icons";
 
 interface HeaderProps {
   activeRoute: "map" | "about" | "disclaimer";
+  /** Compact single-row mobile top bar shown only on small/touch viewports for the map workspace */
+  mobileMapTopbar?: React.ReactNode;
 }
 
-export function Header({ activeRoute }: HeaderProps) {
+export function Header({ activeRoute, mobileMapTopbar }: HeaderProps) {
   return (
-    <header className="site-header">
+    <header
+      className={`site-header${mobileMapTopbar ? " site-header-has-mobile-bar" : ""}`}
+    >
       <div className="site-header-inner">
         <Link href="/" className="brand-link">
           <img
@@ -49,6 +54,10 @@ export function Header({ activeRoute }: HeaderProps) {
           </a>
         </nav>
       </div>
+
+      {mobileMapTopbar && (
+        <div className="mobile-map-topbar">{mobileMapTopbar}</div>
+      )}
     </header>
   );
 }

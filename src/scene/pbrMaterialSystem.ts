@@ -372,8 +372,8 @@ export class PBRMaterialSystem {
   private readonly maxAnisotropy: number;
   public readonly sharedUniforms: GlobalShaderUniforms;
 
-  constructor(renderer: THREE.WebGLRenderer) {
-    this.maxAnisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+  constructor(renderer: THREE.WebGLRenderer, maxAnisotropyCap = 16) {
+    this.maxAnisotropy = Math.min(maxAnisotropyCap, renderer.capabilities.getMaxAnisotropy());
     const puddleNoise = this.loadTex("/textures/env/puddle_noise.webp", false, true);
     const waterNormal = this.loadTex("/textures/env/water_normal.webp", false, true);
 

@@ -240,6 +240,7 @@ export class PostProcessingPipeline {
   private readonly sharpenEffect: CampusSharpenEffect;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly maxMsaaSamples: number;
+  private readonly isMobileTier: boolean;
   private quality: QualityTier;
 
   constructor(
@@ -248,16 +249,26 @@ export class PostProcessingPipeline {
     camera: THREE.PerspectiveCamera,
     width: number,
     height: number,
-    quality: QualityTier
+    quality: QualityTier,
+    isMobileTier = false
   ) {
     this.camera = camera;
     this.quality = quality;
+    this.isMobileTier = isMobileTier;
     this.maxMsaaSamples = Math.min(4, renderer.capabilities.maxSamples || 0);
 
-    // Hardware WebGL2 MSAA delivers crisp subpixel edges without post-process SMAA texture blur
+    // Hardware WebGL2 MSAA delivers crisp subpixel edges without post-process SMAA texture blur;
+    // on mobile "smooth" tier keep MSAA at 0 to preserve 60fps & battery life.
     this.composer = new EffectComposer(renderer, {
       frameBufferType: THREE.HalfFloatType,
-      multisampling: quality === "smooth" ? Math.min(2, this.maxMsaaSamples) : this.maxMsaaSamples,
+      multisampling:
+        quality === "smooth"
+          ? isMobileTier
+            ? 0
+            : Math.min(2, this.maxMsaaSamples)
+          : isMobileTier && quality === "refined"
+            ? Math.min(2, this.maxMsaaSamples)
+            : this.maxMsaaSamples,
     });
 
     const renderPass = new RenderPass(scene, camera);
@@ -278,13 +289,13 @@ export class PostProcessingPipeline {
     this.n8aoPass.configuration.aoRadius = 0.95;
     this.n8aoPass.configuration.distanceFalloff = 1.0;
     this.n8aoPass.configuration.intensity = 1.35;
-    this.n8aoPass.configuration.halfRes = false;
+    this.n8aoPass.configuration.halfRes = isMobileTier && quality === "smooth";
     this.n8aoPass.configuration.gammaCorrection = false; // ToneMappingEffect handles final output encoding
     this.composer.addPass(this.n8aoPass);
 
     this.rtEffect = new CampusRayTraceEffect(this.normalPass.texture);
 
-    // Full-resolution non-destructive selection/hover outline
+    // Full-resolution non-destructive selection/hover outline (0.5x scale on mobile for faster GPU fill)
     this.outlineEffect = new OutlineEffect(scene, camera, {
       blendFunction: BlendFunction.SCREEN,
       edgeStrength: 2.6,
@@ -292,7 +303,7 @@ export class PostProcessingPipeline {
       visibleEdgeColor: 0xf59e0b,
       hiddenEdgeColor: 0x38bdf8,
       multisampling: 0,
-      resolutionScale: 1.0,
+      resolutionScale: isMobileTier ? 0.5 : 1.0,
       blur: false,
       xRay: true,
     });
@@ -304,7 +315,7 @@ export class PostProcessingPipeline {
       luminanceSmoothing: 0.22,
       intensity: 0.18,
       radius: 0.42,
-      kernelSize: KernelSize.MEDIUM,
+      kernelSize: isMobileTier ? KernelSize.SMALL : KernelSize.MEDIUM,
     });
 
     const toneMappingEffect = new ToneMappingEffect({
@@ -333,16 +344,20 @@ export class PostProcessingPipeline {
   public setQuality(quality: QualityTier): void {
     this.quality = quality;
     if (quality === "smooth") {
-      this.composer.multisampling = Math.min(2, this.maxMsaaSamples);
+      this.composer.multisampling = this.isMobileTier
+        ? 0
+        : Math.min(2, this.maxMsaaSamples);
       this.n8aoPass.setQualityMode("Performance");
-      this.n8aoPass.configuration.halfRes = false;
+      this.n8aoPass.configuration.halfRes = this.isMobileTier;
       this.n8aoPass.configuration.denoiseRadius = 4;
       this.n8aoPass.configuration.aoRadius = 0.9;
       this.n8aoPass.configuration.intensity = 1.1;
       this.sharpenEffect.setSharpness(0.08);
       this.normalPass.enabled = false;
     } else if (quality === "refined") {
-      this.composer.multisampling = this.maxMsaaSamples;
+      this.composer.multisampling = this.isMobileTier
+        ? Math.min(2, this.maxMsaaSamples)
+        : this.maxMsaaSamples;
       this.n8aoPass.setQualityMode("Medium");
       this.n8aoPass.configuration.halfRes = false;
       this.n8aoPass.configuration.denoiseRadius = 4;

@@ -130,6 +130,7 @@ export class PathTracerController {
   private skyDomeRef: THREE.Object3D | null = null;
   private active = false;
   private paused = false;
+  private mobileSafeMode = false;
   public targetSamples = 128;
 
   public isActive(): boolean {
@@ -158,9 +159,14 @@ export class PathTracerController {
     loadedRoot: THREE.Object3D,
     skyDome: THREE.Object3D,
     sample: SolarAtmosphereSample,
-    onStatus: (status: PathTracerStatus) => void
+    onStatus: (status: PathTracerStatus) => void,
+    mobileSafeMode = false
   ): Promise<boolean> {
     if (this.active) return true;
+    this.mobileSafeMode = mobileSafeMode;
+    if (mobileSafeMode) {
+      this.targetSamples = 64;
+    }
     onStatus({ phase: "building", samples: 0, targetSamples: this.targetSamples, message: "正在构建光线追踪 BVH 加速结构..." });
 
     try {
@@ -177,19 +183,27 @@ export class PathTracerController {
       this.prevEnv = scene.environment;
 
       if (this.equirectEnv) this.equirectEnv.dispose();
-      this.equirectEnv = buildEquirectSkyDataTexture(sample);
+      this.equirectEnv = buildEquirectSkyDataTexture(
+        sample,
+        mobileSafeMode ? 256 : 512,
+        mobileSafeMode ? 128 : 256
+      );
       scene.environment = this.equirectEnv;
       scene.background = this.equirectEnv;
 
       if (!this.tracer) {
         this.tracer = new PTClass(renderer);
-        this.tracer.bounces = 4;
-        this.tracer.transmissiveBounces = 4;
-        this.tracer.multipleImportanceSampling = true;
-        this.tracer.filterGlossyFactor = 0.5;
-        this.tracer.dynamicLowRes = true;
-        this.tracer.lowResScale = 0.45;
-        this.tracer.renderScale = 1.0;
+      }
+      this.tracer.bounces = mobileSafeMode ? 2 : 4;
+      this.tracer.transmissiveBounces = mobileSafeMode ? 2 : 4;
+      this.tracer.multipleImportanceSampling = true;
+      this.tracer.filterGlossyFactor = 0.5;
+      this.tracer.dynamicLowRes = true;
+      this.tracer.lowResScale = mobileSafeMode ? 0.35 : 0.45;
+      this.tracer.renderScale = mobileSafeMode ? 0.65 : 1.0;
+      if (mobileSafeMode) {
+        this.tracer.tiles.set(3, 3);
+      } else {
         this.tracer.tiles.set(2, 2);
       }
 
@@ -230,7 +244,11 @@ export class PathTracerController {
   public syncEnvironmentAndLights(scene: THREE.Scene, sample: SolarAtmosphereSample): void {
     if (!this.active || !this.tracer) return;
     if (this.equirectEnv) this.equirectEnv.dispose();
-    this.equirectEnv = buildEquirectSkyDataTexture(sample);
+    this.equirectEnv = buildEquirectSkyDataTexture(
+      sample,
+      this.mobileSafeMode ? 256 : 512,
+      this.mobileSafeMode ? 128 : 256
+    );
     scene.environment = this.equirectEnv;
     scene.background = this.equirectEnv;
     this.tracer.updateEnvironment();
@@ -267,8 +285,15 @@ export class PathTracerController {
     }
   }
 
-  /** Captures the current WebGL canvas as a clean PNG download. */
+  /** Captures the current WebGL canvas as a clean PNG download (works even when preserveDrawingBuffer is false). */
   public downloadSnapshot(renderer: THREE.WebGLRenderer, filename: string): void {
+    if (this.active && this.tracer) {
+      // Ensure the latest accumulated framebuffer is presented immediately before readback
+      const prevPaused = this.tracer.pausePathTracing;
+      this.tracer.pausePathTracing = false;
+      this.tracer.renderSample();
+      this.tracer.pausePathTracing = prevPaused;
+    }
     const dataUrl = renderer.domElement.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = dataUrl;

@@ -322,3 +322,51 @@ export function CameraIcon({ size = 14, className }: IconProps) {
     </svg>
   );
 }
+
+export function OrbitIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 16h5v5" />
+    </svg>
+  );
+}
+
+export function HandIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2" />
+      <path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2" />
+      <path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8" />
+      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+    </svg>
+  );
+}
+
+export function ChevronUpIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+export function GridMapIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="12" y1="3" x2="12" y2="21" />
+    </svg>
+  );
+}

@@ -7,6 +7,7 @@ import type { PathTracerStatus } from "@/scene/pathTracerController";
 import {
   CameraIcon,
   ClockIcon,
+  CloseIcon,
   CloudIcon,
   MistIcon,
   MoonIcon,
@@ -22,9 +23,12 @@ interface AtmosphereDockProps {
   state: AtmosphereState;
   pathTracerStatus: PathTracerStatus;
   shifted?: boolean;
+  variant?: "floating" | "sheet";
+  isMobileTier?: boolean;
   onChange: (patch: Partial<AtmosphereState>) => void;
   onSyncBeijingNow: () => void;
   onExportPhoto: () => void;
+  onCloseSheet?: () => void;
 }
 
 const TIME_PRESETS: { label: string; hours: number }[] = [
@@ -69,26 +73,243 @@ export function AtmosphereDock({
   state,
   pathTracerStatus,
   shifted = false,
+  variant = "floating",
+  isMobileTier = false,
   onChange,
   onSyncBeijingNow,
   onExportPhoto,
+  onCloseSheet,
 }: AtmosphereDockProps) {
-  const [expanded, setExpanded] = useState<boolean>(false);
+  const [expanded, setExpanded] = useState<boolean>(variant === "sheet");
 
   useEffect(() => {
+    if (variant === "sheet") {
+      setExpanded(true);
+      return;
+    }
     if (typeof window !== "undefined" && window.innerWidth >= 860) {
       setExpanded(true);
     }
-  }, []);
+  }, [variant]);
 
   useEffect(() => {
     if (state.pathTracingActive) {
       setExpanded(true);
     }
   }, [state.pathTracingActive]);
+
+  const isSheet = variant === "sheet";
   const isNight = state.timeHours < 5.5 || state.timeHours >= 18.8;
   const formattedTime = formatTimeHours(state.timeHours);
   const phaseLabel = getPhaseLabel(state.timeHours);
+
+  const controlsBody = (
+    <div className={`atmo-body${isSheet ? " atmo-body-sheet" : ""}`}>
+      {/* 24h Continuous Solar Time Slider */}
+      <div className="atmo-slider-wrap">
+        <input
+          type="range"
+          min={0}
+          max={23.98}
+          step={0.05}
+          value={state.timeHours}
+          aria-label="24小时连续太阳时间拉条"
+          className="atmo-time-slider"
+          onChange={(e) =>
+            onChange({
+              timeHours: parseFloat(e.target.value),
+              syncBeijingTime: false,
+              autoPlay: false,
+            })
+          }
+        />
+        <div className="atmo-scale-labels">
+          <span>00:00</span>
+          <span>06:00</span>
+          <span>12:00</span>
+          <span>18:00</span>
+          <span>24:00</span>
+        </div>
+      </div>
+
+      {/* 6 Curated Golden Moments */}
+      <div className="atmo-row-chips">
+        {TIME_PRESETS.map((p) => {
+          const active = Math.abs(state.timeHours - p.hours) < 0.35;
+          return (
+            <button
+              key={p.label}
+              type="button"
+              className={`atmo-chip ${active ? "atmo-chip-active" : ""}`}
+              onClick={() =>
+                onChange({
+                  timeHours: p.hours,
+                  syncBeijingTime: false,
+                  autoPlay: false,
+                })
+              }
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 5 Weather Modes */}
+      <div className="atmo-section-row">
+        <span className="atmo-section-label">天气</span>
+        <div className="atmo-pill-group">
+          {WEATHER_OPTIONS.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              className={`atmo-pill ${state.weather === w.id ? "atmo-pill-active" : ""}`}
+              onClick={() => onChange({ weather: w.id })}
+            >
+              <WeatherIcon mode={w.id} size={13} />
+              <span>{w.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Quality Tier + True GPU Path Tracing Switch */}
+      <div className="atmo-section-row atmo-bottom-row">
+        <div className="atmo-quality-group" title="实时渲染画质档位">
+          <span className="atmo-section-label">画质</span>
+          <div className="atmo-pill-group">
+            {QUALITY_OPTIONS.map((q) => (
+              <button
+                key={q.id}
+                type="button"
+                disabled={state.pathTracingActive}
+                className={`atmo-pill ${
+                  !state.pathTracingActive && state.quality === q.id
+                    ? "atmo-pill-active"
+                    : ""
+                }`}
+                onClick={() => onChange({ quality: q.id })}
+              >
+                {q.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className={`atmo-rt-btn ${state.pathTracingActive ? "atmo-rt-btn-active" : ""}`}
+          onClick={() =>
+            onChange({
+              pathTracingActive: !state.pathTracingActive,
+              autoPlay: false,
+            })
+          }
+          title="开启 GPU 真实蒙特卡洛路径追踪（静止累积多重反弹全局光照与玻璃真折射）"
+        >
+          <SparklesIcon size={13} />
+          <span>{state.pathTracingActive ? "退出真光追" : "真光追"}</span>
+        </button>
+      </div>
+
+      {isMobileTier && !state.pathTracingActive && (
+        <p className="atmo-mobile-rt-hint">
+          移动端开启「真光追」将自动采用节能采样（64 spp），渲染较耗电且需静止画面等待收敛。
+        </p>
+      )}
+
+      {/* True Path Tracing Progress & High-Res Photo Capture Bar */}
+      {state.pathTracingActive && (
+        <div className="atmo-pt-status">
+          <div className="atmo-pt-row">
+            <span>
+              {pathTracerStatus.phase === "building"
+                ? pathTracerStatus.message ?? "构建 BVH..."
+                : pathTracerStatus.phase === "error"
+                  ? pathTracerStatus.message ?? "真光追不可用"
+                  : `真路径追踪收敛中 · ${pathTracerStatus.samples}/${pathTracerStatus.targetSamples} spp`}
+            </span>
+            {pathTracerStatus.phase === "rendering" && (
+              <button
+                type="button"
+                className="atmo-snap-btn"
+                onClick={onExportPhoto}
+                title="导出当前光追渲染画面为高清 PNG 写真"
+              >
+                <CameraIcon size={12} />
+                <span>保存写真</span>
+              </button>
+            )}
+          </div>
+          {pathTracerStatus.phase === "rendering" && (
+            <div className="atmo-pt-bar">
+              <div
+                className="atmo-pt-fill"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (pathTracerStatus.samples / Math.max(1, pathTracerStatus.targetSamples)) *
+                      100
+                  )}%`,
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  if (isSheet) {
+    return (
+      <div className="atmo-sheet-inner" aria-label="三维天光、时间、天气与光线追踪控制台">
+        <div className="atmo-header atmo-header-sheet">
+          <div className="atmo-toggle-btn atmo-sheet-title">
+            <span className={`atmo-orb ${isNight ? "atmo-orb-night" : "atmo-orb-day"}`}>
+              {isNight ? <MoonIcon size={13} /> : <SunIcon size={13} />}
+            </span>
+            <span className="atmo-time-readout">{formattedTime}</span>
+            <span className="atmo-phase-tag">{phaseLabel}</span>
+          </div>
+
+          <div className="atmo-header-quick">
+            <button
+              type="button"
+              className={`atmo-mini-btn ${state.autoPlay ? "atmo-mini-btn-active" : ""}`}
+              onClick={() =>
+                onChange({ autoPlay: !state.autoPlay, syncBeijingTime: false })
+              }
+              title={state.autoPlay ? "暂停昼夜延时" : "播放昼夜光影流转"}
+              aria-label={state.autoPlay ? "暂停昼夜延时" : "播放昼夜光影流转"}
+            >
+              {state.autoPlay ? <PauseIcon size={13} /> : <PlayIcon size={13} />}
+              <span>{state.autoPlay ? "暂停" : "延时"}</span>
+            </button>
+            <button
+              type="button"
+              className={`atmo-mini-btn ${state.syncBeijingTime ? "atmo-mini-btn-active" : ""}`}
+              onClick={onSyncBeijingNow}
+              title="同步当前北京时间（东城区真实太阳高度）"
+            >
+              <ClockIcon size={13} />
+              <span>北京</span>
+            </button>
+            {onCloseSheet && (
+              <button
+                type="button"
+                className="atmo-mini-btn atmo-sheet-close-btn"
+                onClick={onCloseSheet}
+                aria-label="关闭光影天气面板"
+              >
+                <CloseIcon size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+        {controlsBody}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -137,156 +358,7 @@ export function AtmosphereDock({
         </div>
       </div>
 
-      {expanded && (
-        <div className="atmo-body">
-          {/* 24h Continuous Solar Time Slider */}
-          <div className="atmo-slider-wrap">
-            <input
-              type="range"
-              min={0}
-              max={23.98}
-              step={0.05}
-              value={state.timeHours}
-              aria-label="24小时连续太阳时间拉条"
-              className="atmo-time-slider"
-              onChange={(e) =>
-                onChange({
-                  timeHours: parseFloat(e.target.value),
-                  syncBeijingTime: false,
-                  autoPlay: false,
-                })
-              }
-            />
-            <div className="atmo-scale-labels">
-              <span>00:00</span>
-              <span>06:00</span>
-              <span>12:00</span>
-              <span>18:00</span>
-              <span>24:00</span>
-            </div>
-          </div>
-
-          {/* 6 Curated Golden Moments */}
-          <div className="atmo-row-chips">
-            {TIME_PRESETS.map((p) => {
-              const active = Math.abs(state.timeHours - p.hours) < 0.35;
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  className={`atmo-chip ${active ? "atmo-chip-active" : ""}`}
-                  onClick={() =>
-                    onChange({
-                      timeHours: p.hours,
-                      syncBeijingTime: false,
-                      autoPlay: false,
-                    })
-                  }
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 5 Weather Modes */}
-          <div className="atmo-section-row">
-            <span className="atmo-section-label">天气</span>
-            <div className="atmo-pill-group">
-              {WEATHER_OPTIONS.map((w) => (
-                <button
-                  key={w.id}
-                  type="button"
-                  className={`atmo-pill ${state.weather === w.id ? "atmo-pill-active" : ""}`}
-                  onClick={() => onChange({ weather: w.id })}
-                >
-                  <WeatherIcon mode={w.id} size={12} />
-                  <span>{w.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Quality Tier + True GPU Path Tracing Switch */}
-          <div className="atmo-section-row atmo-bottom-row">
-            <div className="atmo-quality-group" title="实时渲染画质档位">
-              <span className="atmo-section-label">画质</span>
-              <div className="atmo-pill-group">
-                {QUALITY_OPTIONS.map((q) => (
-                  <button
-                    key={q.id}
-                    type="button"
-                    disabled={state.pathTracingActive}
-                    className={`atmo-pill ${
-                      !state.pathTracingActive && state.quality === q.id
-                        ? "atmo-pill-active"
-                        : ""
-                    }`}
-                    onClick={() => onChange({ quality: q.id })}
-                  >
-                    {q.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className={`atmo-rt-btn ${state.pathTracingActive ? "atmo-rt-btn-active" : ""}`}
-              onClick={() =>
-                onChange({
-                  pathTracingActive: !state.pathTracingActive,
-                  autoPlay: false,
-                })
-              }
-              title="开启 GPU 真实蒙特卡洛路径追踪（静止累积多重反弹全局光照与玻璃真折射）"
-            >
-              <SparklesIcon size={13} />
-              <span>{state.pathTracingActive ? "退出真光追" : "真光追"}</span>
-            </button>
-          </div>
-
-          {/* True Path Tracing Progress & High-Res Photo Capture Bar */}
-          {state.pathTracingActive && (
-            <div className="atmo-pt-status">
-              <div className="atmo-pt-row">
-                <span>
-                  {pathTracerStatus.phase === "building"
-                    ? pathTracerStatus.message ?? "构建 BVH..."
-                    : pathTracerStatus.phase === "error"
-                    ? pathTracerStatus.message ?? "真光追不可用"
-                    : `真路径追踪收敛中 · ${pathTracerStatus.samples}/${pathTracerStatus.targetSamples} spp`}
-                </span>
-                {pathTracerStatus.phase === "rendering" && (
-                  <button
-                    type="button"
-                    className="atmo-snap-btn"
-                    onClick={onExportPhoto}
-                    title="导出当前光追渲染画面为高清 PNG 写真"
-                  >
-                    <CameraIcon size={12} />
-                    <span>保存写真</span>
-                  </button>
-                )}
-              </div>
-              {pathTracerStatus.phase === "rendering" && (
-                <div className="atmo-pt-bar">
-                  <div
-                    className="atmo-pt-fill"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (pathTracerStatus.samples / Math.max(1, pathTracerStatus.targetSamples)) *
-                          100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      {expanded && controlsBody}
     </div>
   );
 }
