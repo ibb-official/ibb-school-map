@@ -11,11 +11,6 @@ interface MobileBottomSheetProps {
   variant?: "single" | "two-stage";
   snap?: SheetSnap;
   onSnapChange?: (next: SheetSnap) => void;
-  theme?: "light" | "dark";
-  /**
-   * When false, the map above remains directly interactive (ideal for Peek cards
-   * and the live Atmosphere lighting sheet).
-   */
   modalBackdrop?: boolean;
   header?: React.ReactNode;
   peekContent?: React.ReactNode;
@@ -30,7 +25,6 @@ export function MobileBottomSheet({
   variant = "single",
   snap = "expanded",
   onSnapChange,
-  theme = "light",
   modalBackdrop = true,
   header,
   peekContent,
@@ -46,7 +40,6 @@ export function MobileBottomSheet({
     startTime: number;
     lastY: number;
   } | null>(null);
-  const bodyRef = useRef<HTMLDivElement | null>(null);
 
   const isPeek = variant === "two-stage" && snap === "peek";
   const showBackdrop = open && modalBackdrop && !isPeek;
@@ -75,7 +68,6 @@ export function MobileBottomSheet({
   if (!open) return null;
 
   const beginDrag = (ev: React.PointerEvent<HTMLElement>) => {
-    // Allow interactive buttons/inputs inside header to receive normal taps
     const target = ev.target as HTMLElement | null;
     if (target?.closest("button, a, input, select, textarea")) {
       return;
@@ -97,7 +89,6 @@ export function MobileBottomSheet({
     st.lastY = ev.clientY;
 
     if (dy < 0) {
-      // Allow upward drag in peek mode; gentle rubber-band resistance otherwise
       const resisted = isPeek ? Math.max(dy, -140) : Math.max(dy * 0.22, -32);
       setDragOffset(resisted);
     } else {
@@ -110,7 +101,7 @@ export function MobileBottomSheet({
     if (!st || st.pointerId !== ev.pointerId) return;
     const dy = st.lastY - st.startY;
     const dt = Math.max(performance.now() - st.startTime, 1);
-    const velocity = dy / dt; // px per ms
+    const velocity = dy / dt;
 
     dragStateRef.current = null;
     setIsDragging(false);
@@ -154,7 +145,7 @@ export function MobileBottomSheet({
     <>
       {showBackdrop && (
         <div
-          className="mobile-sheet-backdrop"
+          className="s2-sheet-backdrop"
           onClick={handleBackdropClick}
           aria-hidden="true"
         />
@@ -163,9 +154,9 @@ export function MobileBottomSheet({
         role="dialog"
         aria-modal={showBackdrop}
         aria-label={ariaLabel}
-        className={`mobile-sheet mobile-sheet-${theme} ${
-          isPeek ? "mobile-sheet-peek" : "mobile-sheet-expanded"
-        } ${isDragging ? "mobile-sheet-dragging" : ""} ${className}`}
+        className={`s2-sheet ${isPeek ? "s2-sheet-peek" : "s2-sheet-expanded"} ${
+          isDragging ? "s2-sheet-dragging" : ""
+        } ${className}`.trim()}
         style={
           dragOffset !== 0
             ? { transform: `translate3d(0, ${dragOffset.toFixed(1)}px, 0)` }
@@ -173,21 +164,21 @@ export function MobileBottomSheet({
         }
       >
         <div
-          className="mobile-sheet-drag-zone"
+          className="s2-sheet-drag-zone"
           onPointerDown={beginDrag}
           onPointerMove={moveDrag}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
         >
-          <div className="mobile-sheet-handle-bar" aria-hidden="true">
-            <span className="mobile-sheet-handle-pill" />
+          <div className="s2-sheet-handle" aria-hidden="true">
+            <span className="s2-sheet-handle-pill" />
           </div>
-          {header && <div className="mobile-sheet-header">{header}</div>}
+          {header && <div className="s2-sheet-header">{header}</div>}
         </div>
 
         {isPeek && peekContent ? (
           <div
-            className="mobile-sheet-peek-body"
+            className="s2-sheet-peek-body"
             onPointerDown={beginDrag}
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
@@ -196,9 +187,7 @@ export function MobileBottomSheet({
             {peekContent}
           </div>
         ) : (
-          <div ref={bodyRef} className="mobile-sheet-body">
-            {children}
-          </div>
+          <div className="s2-sheet-body">{children}</div>
         )}
       </section>
     </>

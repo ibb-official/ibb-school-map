@@ -277,9 +277,9 @@ export class LightingAndWeatherSystem {
   }
 
   private shadowSizeForQuality(quality: QualityTier): number {
-    if (quality === "smooth") return 1024;
-    if (quality === "refined") return 2048;
-    return 4096; // Ultra High Quality: razor-sharp 4K world-locked shadow map
+    if (quality === "low") return 1024;
+    if (quality === "medium" || quality === "high") return 2048;
+    return 4096; // Ultra High Quality: razor-sharp 4K world-locked shadow map (unrestricted on all devices)
   }
 
   private createRadialGlowTexture(): THREE.CanvasTexture {
@@ -309,7 +309,7 @@ export class LightingAndWeatherSystem {
         this.sunLight.shadow.map.dispose();
         this.sunLight.shadow.map = null;
       }
-      this.sunLight.shadow.radius = quality === "cinematic" ? 1.25 : 1.65;
+      this.sunLight.shadow.radius = quality === "ultra" ? 1.25 : 1.65;
       this.sunLight.shadow.needsUpdate = true;
     }
   }

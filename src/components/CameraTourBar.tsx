@@ -7,14 +7,14 @@ interface CameraTourBarProps {
   tours: CameraTourStop[];
   activeTourId: string | null;
   onSelectTour: (tour: CameraTourStop) => void;
-  variant?: "floating" | "inline";
+  elevatedForVpad?: boolean;
 }
 
 export function CameraTourBar({
   tours,
   activeTourId,
   onSelectTour,
-  variant = "floating",
+  elevatedForVpad = false,
 }: CameraTourBarProps) {
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
@@ -30,28 +30,30 @@ export function CameraTourBar({
 
   return (
     <div
-      className={variant === "inline" ? "tour-inline-strip" : "tour-dock"}
+      className={`hud-tour-dock${elevatedForVpad ? " hud-tour-dock-raised" : ""}`}
       role="toolbar"
       aria-label="精选导览视角"
     >
-      {tours.map((tour) => {
-        const active = tour.id === activeTourId;
-        return (
-          <button
-            key={tour.id}
-            ref={(el) => {
-              if (el) pillRefs.current.set(tour.id, el);
-              else pillRefs.current.delete(tour.id);
-            }}
-            type="button"
-            className={`tour-pill ${active ? "tour-pill-active" : ""}`}
-            onClick={() => onSelectTour(tour)}
-            title={tour.subtitle}
-          >
-            {tour.title}
-          </button>
-        );
-      })}
+      <div className="hud-tour-scroll">
+        {tours.map((tour) => {
+          const active = tour.id === activeTourId;
+          return (
+            <button
+              key={tour.id}
+              ref={(el) => {
+                if (el) pillRefs.current.set(tour.id, el);
+                else pillRefs.current.delete(tour.id);
+              }}
+              type="button"
+              className={`hud-tour-pill${active ? " hud-tour-pill-active" : ""}`}
+              onClick={() => onSelectTour(tour)}
+              title={tour.subtitle}
+            >
+              {tour.title}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

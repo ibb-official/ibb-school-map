@@ -1,34 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AtmosphereState, QualityTier, WeatherMode } from "@/data/types";
-import { formatTimeHours, getPhaseLabel } from "@/scene/sunAstronomy";
+import { ActionButton } from "@react-spectrum/s2/ActionButton";
+import { Badge } from "@react-spectrum/s2/Badge";
+import { Button, Text } from "@react-spectrum/s2/Button";
+import { CloseButton } from "@react-spectrum/s2/CloseButton";
+import { Divider } from "@react-spectrum/s2/Divider";
+import { ProgressBar } from "@react-spectrum/s2/ProgressBar";
+import { SegmentedControl, SegmentedControlItem } from "@react-spectrum/s2/SegmentedControl";
+import { Slider } from "@react-spectrum/s2/Slider";
+import { ToggleButton } from "@react-spectrum/s2/ToggleButton";
+import Camera from "@react-spectrum/s2/icons/Camera";
+import Clock from "@react-spectrum/s2/icons/Clock";
+import Pause from "@react-spectrum/s2/icons/Pause";
+import Play from "@react-spectrum/s2/icons/Play";
+import Lighten from "@react-spectrum/s2/icons/Lighten";
+import { AtmosphereState, WeatherMode } from "@/data/types";
 import type { PathTracerStatus } from "@/scene/pathTracerController";
-import {
-  CameraIcon,
-  ClockIcon,
-  CloseIcon,
-  CloudIcon,
-  MistIcon,
-  MoonIcon,
-  PauseIcon,
-  PlayIcon,
-  RainIcon,
-  SnowIcon,
-  SparklesIcon,
-  SunIcon,
-} from "./Icons";
+import { formatTimeHours, getPhaseLabel } from "@/scene/sunAstronomy";
 
 interface AtmosphereDockProps {
   state: AtmosphereState;
   pathTracerStatus: PathTracerStatus;
-  shifted?: boolean;
-  variant?: "floating" | "sheet";
-  isMobileTier?: boolean;
   onChange: (patch: Partial<AtmosphereState>) => void;
   onSyncBeijingNow: () => void;
   onExportPhoto: () => void;
-  onCloseSheet?: () => void;
+  onClose?: () => void;
 }
 
 const TIME_PRESETS: { label: string; hours: number }[] = [
@@ -48,317 +44,197 @@ const WEATHER_OPTIONS: { id: WeatherMode; label: string }[] = [
   { id: "snowy", label: "初雪" },
 ];
 
-const QUALITY_OPTIONS: { id: QualityTier; label: string }[] = [
-  { id: "smooth", label: "流畅" },
-  { id: "refined", label: "标准" },
-  { id: "cinematic", label: "极致画质" },
-];
-
-function WeatherIcon({ mode, size = 13 }: { mode: WeatherMode; size?: number }) {
-  switch (mode) {
-    case "clear":
-      return <SunIcon size={size} />;
-    case "cloudy":
-      return <CloudIcon size={size} />;
-    case "rainy":
-      return <RainIcon size={size} />;
-    case "misty":
-      return <MistIcon size={size} />;
-    case "snowy":
-      return <SnowIcon size={size} />;
-  }
-}
-
+/**
+ * Spectrum 2 redesigned Atmosphere / Solar Time / Weather / Path Tracing panel.
+ * Rendered ONLY when Enhanced Map mode is enabled.
+ */
 export function AtmosphereDock({
   state,
   pathTracerStatus,
-  shifted = false,
-  variant = "floating",
-  isMobileTier = false,
   onChange,
   onSyncBeijingNow,
   onExportPhoto,
-  onCloseSheet,
+  onClose,
 }: AtmosphereDockProps) {
-  const [expanded, setExpanded] = useState<boolean>(variant === "sheet");
-
-  useEffect(() => {
-    if (variant === "sheet") {
-      setExpanded(true);
-      return;
-    }
-    if (typeof window !== "undefined" && window.innerWidth >= 860) {
-      setExpanded(true);
-    }
-  }, [variant]);
-
-  useEffect(() => {
-    if (state.pathTracingActive) {
-      setExpanded(true);
-    }
-  }, [state.pathTracingActive]);
-
-  const isSheet = variant === "sheet";
-  const isNight = state.timeHours < 5.5 || state.timeHours >= 18.8;
   const formattedTime = formatTimeHours(state.timeHours);
   const phaseLabel = getPhaseLabel(state.timeHours);
 
-  const controlsBody = (
-    <div className={`atmo-body${isSheet ? " atmo-body-sheet" : ""}`}>
+  return (
+    <div className="atmo-s2-panel" aria-label="增强版天光、时间、天气与光追面板">
+      <div className="atmo-s2-header">
+        <div className="atmo-s2-title-group">
+          <span className="atmo-s2-time">{formattedTime}</span>
+          <Badge variant="informative" fillStyle="subtle" size="S">
+            {phaseLabel}
+          </Badge>
+        </div>
+
+        <div className="atmo-s2-header-actions">
+          <ToggleButton
+            size="S"
+            isQuiet
+            isEmphasized
+            isSelected={state.autoPlay}
+            onChange={(selected) =>
+              onChange({ autoPlay: selected, syncBeijingTime: false })
+            }
+            aria-label={state.autoPlay ? "暂停昼夜延时" : "播放昼夜延时"}
+          >
+            {state.autoPlay ? <Pause /> : <Play />}
+          </ToggleButton>
+
+          <ToggleButton
+            size="S"
+            isQuiet
+            isEmphasized
+            isSelected={state.syncBeijingTime}
+            onChange={() => onSyncBeijingNow()}
+            aria-label="同步当前北京时间"
+          >
+            <Clock />
+          </ToggleButton>
+
+          {onClose && <CloseButton size="S" onPress={onClose} />}
+        </div>
+      </div>
+
       {/* 24h Continuous Solar Time Slider */}
-      <div className="atmo-slider-wrap">
-        <input
-          type="range"
-          min={0}
-          max={23.98}
+      <div className="atmo-s2-section">
+        <Slider
+          aria-label="24小时连续北京太阳时刻"
+          size="S"
+          isEmphasized
+          UNSAFE_style={{ width: "100%" }}
+          minValue={0}
+          maxValue={23.95}
           step={0.05}
           value={state.timeHours}
-          aria-label="24小时连续太阳时间拉条"
-          className="atmo-time-slider"
-          onChange={(e) =>
+          onChange={(val) =>
             onChange({
-              timeHours: parseFloat(e.target.value),
+              timeHours: val,
               syncBeijingTime: false,
               autoPlay: false,
             })
           }
         />
-        <div className="atmo-scale-labels">
-          <span>00:00</span>
-          <span>06:00</span>
-          <span>12:00</span>
-          <span>18:00</span>
-          <span>24:00</span>
+
+        <div className="atmo-s2-presets">
+          {TIME_PRESETS.map((p) => {
+            const active = Math.abs(state.timeHours - p.hours) < 0.35;
+            return (
+              <ActionButton
+                key={p.label}
+                size="XS"
+                isQuiet={!active}
+                onPress={() =>
+                  onChange({
+                    timeHours: p.hours,
+                    syncBeijingTime: false,
+                    autoPlay: false,
+                  })
+                }
+              >
+                {p.label}
+              </ActionButton>
+            );
+          })}
         </div>
       </div>
 
-      {/* 6 Curated Golden Moments */}
-      <div className="atmo-row-chips">
-        {TIME_PRESETS.map((p) => {
-          const active = Math.abs(state.timeHours - p.hours) < 0.35;
-          return (
-            <button
-              key={p.label}
-              type="button"
-              className={`atmo-chip ${active ? "atmo-chip-active" : ""}`}
-              onClick={() =>
-                onChange({
-                  timeHours: p.hours,
-                  syncBeijingTime: false,
-                  autoPlay: false,
-                })
-              }
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
+      <Divider size="S" />
 
       {/* 5 Weather Modes */}
-      <div className="atmo-section-row">
-        <span className="atmo-section-label">天气</span>
-        <div className="atmo-pill-group">
-          {WEATHER_OPTIONS.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              className={`atmo-pill ${state.weather === w.id ? "atmo-pill-active" : ""}`}
-              onClick={() => onChange({ weather: w.id })}
-            >
-              <WeatherIcon mode={w.id} size={13} />
-              <span>{w.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Quality Tier + True GPU Path Tracing Switch */}
-      <div className="atmo-section-row atmo-bottom-row">
-        <div className="atmo-quality-group" title="实时渲染画质档位">
-          <span className="atmo-section-label">画质</span>
-          <div className="atmo-pill-group">
-            {QUALITY_OPTIONS.map((q) => (
-              <button
-                key={q.id}
-                type="button"
-                disabled={state.pathTracingActive}
-                className={`atmo-pill ${
-                  !state.pathTracingActive && state.quality === q.id
-                    ? "atmo-pill-active"
-                    : ""
-                }`}
-                onClick={() => onChange({ quality: q.id })}
-              >
-                {q.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className={`atmo-rt-btn ${state.pathTracingActive ? "atmo-rt-btn-active" : ""}`}
-          onClick={() =>
-            onChange({
-              pathTracingActive: !state.pathTracingActive,
-              autoPlay: false,
-            })
-          }
-          title="开启 GPU 真实蒙特卡洛路径追踪（静止累积多重反弹全局光照与玻璃真折射）"
-        >
-          <SparklesIcon size={13} />
-          <span>{state.pathTracingActive ? "退出真光追" : "真光追"}</span>
-        </button>
-      </div>
-
-      {isMobileTier && !state.pathTracingActive && (
-        <p className="atmo-mobile-rt-hint">
-          移动端开启「真光追」将自动采用节能采样（64 spp），渲染较耗电且需静止画面等待收敛。
-        </p>
-      )}
-
-      {/* True Path Tracing Progress & High-Res Photo Capture Bar */}
-      {state.pathTracingActive && (
-        <div className="atmo-pt-status">
-          <div className="atmo-pt-row">
-            <span>
-              {pathTracerStatus.phase === "building"
-                ? pathTracerStatus.message ?? "构建 BVH..."
-                : pathTracerStatus.phase === "error"
-                  ? pathTracerStatus.message ?? "真光追不可用"
-                  : `真路径追踪收敛中 · ${pathTracerStatus.samples}/${pathTracerStatus.targetSamples} spp`}
-            </span>
-            {pathTracerStatus.phase === "rendering" && (
-              <button
-                type="button"
-                className="atmo-snap-btn"
-                onClick={onExportPhoto}
-                title="导出当前光追渲染画面为高清 PNG 写真"
-              >
-                <CameraIcon size={12} />
-                <span>保存写真</span>
-              </button>
-            )}
-          </div>
-          {pathTracerStatus.phase === "rendering" && (
-            <div className="atmo-pt-bar">
-              <div
-                className="atmo-pt-fill"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    (pathTracerStatus.samples / Math.max(1, pathTracerStatus.targetSamples)) *
-                      100
-                  )}%`,
-                }}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  if (isSheet) {
-    return (
-      <div className="atmo-sheet-inner" aria-label="三维天光、时间、天气与光线追踪控制台">
-        <div className="atmo-header atmo-header-sheet">
-          <div className="atmo-toggle-btn atmo-sheet-title">
-            <span className={`atmo-orb ${isNight ? "atmo-orb-night" : "atmo-orb-day"}`}>
-              {isNight ? <MoonIcon size={13} /> : <SunIcon size={13} />}
-            </span>
-            <span className="atmo-time-readout">{formattedTime}</span>
-            <span className="atmo-phase-tag">{phaseLabel}</span>
-          </div>
-
-          <div className="atmo-header-quick">
-            <button
-              type="button"
-              className={`atmo-mini-btn ${state.autoPlay ? "atmo-mini-btn-active" : ""}`}
-              onClick={() =>
-                onChange({ autoPlay: !state.autoPlay, syncBeijingTime: false })
-              }
-              title={state.autoPlay ? "暂停昼夜延时" : "播放昼夜光影流转"}
-              aria-label={state.autoPlay ? "暂停昼夜延时" : "播放昼夜光影流转"}
-            >
-              {state.autoPlay ? <PauseIcon size={13} /> : <PlayIcon size={13} />}
-              <span>{state.autoPlay ? "暂停" : "延时"}</span>
-            </button>
-            <button
-              type="button"
-              className={`atmo-mini-btn ${state.syncBeijingTime ? "atmo-mini-btn-active" : ""}`}
-              onClick={onSyncBeijingNow}
-              title="同步当前北京时间（东城区真实太阳高度）"
-            >
-              <ClockIcon size={13} />
-              <span>北京</span>
-            </button>
-            {onCloseSheet && (
-              <button
-                type="button"
-                className="atmo-mini-btn atmo-sheet-close-btn"
-                onClick={onCloseSheet}
-                aria-label="关闭光影天气面板"
-              >
-                <CloseIcon size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-        {controlsBody}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`atmo-dock ${expanded ? "atmo-dock-expanded" : "atmo-dock-collapsed"}${
-        shifted ? " atmo-dock-shifted" : ""
-      }`}
-      aria-label="三维天光、时间、天气与光线追踪控制台"
-    >
-      {/* Compact Header Summary Row */}
-      <div className="atmo-header">
-        <button
-          type="button"
-          className="atmo-toggle-btn"
-          onClick={() => setExpanded((v) => !v)}
-          title={expanded ? "收起光影天气面板" : "展开光影天气面板"}
-        >
-          <span className={`atmo-orb ${isNight ? "atmo-orb-night" : "atmo-orb-day"}`}>
-            {isNight ? <MoonIcon size={13} /> : <SunIcon size={13} />}
-          </span>
-          <span className="atmo-time-readout">{formattedTime}</span>
-          <span className="atmo-phase-tag">{phaseLabel}</span>
-          <span className="atmo-chevron">{expanded ? "▾" : "▸"}</span>
-        </button>
-
-        <div className="atmo-header-quick">
-          <button
-            type="button"
-            className={`atmo-mini-btn ${state.autoPlay ? "atmo-mini-btn-active" : ""}`}
-            onClick={() =>
-              onChange({ autoPlay: !state.autoPlay, syncBeijingTime: false })
+      <div className="atmo-s2-section">
+        <div className="atmo-s2-label">校园天气</div>
+        <SegmentedControl
+          aria-label="选择校园天气"
+          isJustified
+          UNSAFE_style={{ width: "100%" }}
+          selectedKey={state.weather}
+          onSelectionChange={(key) => {
+            if (
+              key === "clear" ||
+              key === "cloudy" ||
+              key === "rainy" ||
+              key === "misty" ||
+              key === "snowy"
+            ) {
+              onChange({ weather: key });
             }
-            title={state.autoPlay ? "暂停昼夜延时" : "播放昼夜光影流转"}
-            aria-label={state.autoPlay ? "暂停昼夜延时" : "播放昼夜光影流转"}
-          >
-            {state.autoPlay ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
-          </button>
-          <button
-            type="button"
-            className={`atmo-mini-btn ${state.syncBeijingTime ? "atmo-mini-btn-active" : ""}`}
-            onClick={onSyncBeijingNow}
-            title="同步当前北京时间（东城区真实太阳高度）"
-          >
-            <ClockIcon size={12} />
-            <span>北京</span>
-          </button>
-        </div>
+          }}
+        >
+          {WEATHER_OPTIONS.map((w) => (
+            <SegmentedControlItem key={w.id} id={w.id}>
+              {w.label}
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
       </div>
 
-      {expanded && controlsBody}
+      <Divider size="S" />
+
+      {/* GPU Path Tracing (Lazy-loaded on demand) */}
+      <div className="atmo-s2-section">
+        <div className="atmo-s2-rt-row">
+          <div>
+            <div className="atmo-s2-label" style={{ marginBottom: "2px" }}>
+              GPU 真路径追踪
+            </div>
+            <div className="atmo-s2-helper">
+              静止累积多重反弹全局光照与玻璃真折射
+            </div>
+          </div>
+
+          <ToggleButton
+            size="S"
+            isEmphasized
+            isSelected={state.pathTracingActive}
+            onChange={(selected) =>
+              onChange({ pathTracingActive: selected, autoPlay: false })
+            }
+          >
+            <Lighten />
+            <Text>{state.pathTracingActive ? "退出" : "开启"}</Text>
+          </ToggleButton>
+        </div>
+
+        {state.pathTracingActive && (
+          <div className="atmo-s2-pt-box">
+            {pathTracerStatus.phase === "building" ? (
+              <ProgressBar
+                size="S"
+                isIndeterminate
+                label={pathTracerStatus.message ?? "正在构建 BVH 加速结构..."}
+              />
+            ) : pathTracerStatus.phase === "error" ? (
+              <div className="atmo-s2-pt-error">
+                {pathTracerStatus.message ?? "当前 GPU 暂不支持路径追踪"}
+              </div>
+            ) : (
+              <>
+                <ProgressBar
+                  size="S"
+                  label={`光线追踪收敛中 (${pathTracerStatus.samples}/${pathTracerStatus.targetSamples} spp)`}
+                  value={Math.min(
+                    100,
+                    Math.round(
+                      (pathTracerStatus.samples /
+                        Math.max(1, pathTracerStatus.targetSamples)) *
+                        100
+                    )
+                  )}
+                />
+                <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end" }}>
+                  <Button size="S" variant="accent" onPress={onExportPhoto}>
+                    <Camera />
+                    <Text>保存高清写真</Text>
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

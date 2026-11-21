@@ -16,14 +16,6 @@ import {
 import { N8AOPostPass } from "n8ao";
 import { QualityTier } from "@/data/types";
 
-/**
- * Physically restrained WebGL2 Screen-Space Reflections (SSR) for rain-wet ground &
- * glossy surfaces + smooth clamped single-bounce GI (Ultra mode only).
- *
- * Designed specifically for zero shimmer / zero light-pumping when orbiting or zooming:
- * - Dry matte walls/roofs do NOT receive noisy SSR
- * - Ray stepping uses smooth depth-tolerant intersection without screen-UV phase jitter
- */
 const CAMPUS_RT_FRAG = /* glsl */ `
   uniform sampler2D uNormalBuffer;
   uniform mat4 uProjectionMatrix;
@@ -65,7 +57,6 @@ const CAMPUS_RT_FRAG = /* glsl */ `
 
     vec3 col = inputColor.rgb;
 
-    // 1. Clean Screen-Space Reflections strictly on rain-wet ground/puddles (zero dry-concrete shimmer!)
     if (uSsrStrength > 0.001 && uWetness > 0.05) {
       float upReflect = smoothstep(0.74, 0.96, worldNormal.y) * uWetness;
       float fresnel = pow(1.0 - clamp(dot(-viewDir, viewNormal), 0.0, 1.0), 3.6);
@@ -109,7 +100,6 @@ const CAMPUS_RT_FRAG = /* glsl */ `
       }
     }
 
-    // 2. Smooth, bounded single-bounce indirect color bleed (Ultra quality only; fixed tap angles prevent shimmer)
     if (uSsgiStrength > 0.001) {
       vec3 giAccum = vec3(0.0);
       float wSum = 0.0;
@@ -146,11 +136,6 @@ const CAMPUS_RT_FRAG = /* glsl */ `
   }
 `;
 
-/**
- * Contrast-Adaptive Sharpening (CAS-inspired) pass executed AFTER tone mapping.
- * Restores photographic crispness to brickwork mortar, engraved stone plaques,
- * window mullions, and botanical foliage without white halo ringing.
- */
 const CAMPUS_SHARPEN_FRAG = /* glsl */ `
   uniform float uSharpness;
 
@@ -169,7 +154,6 @@ const CAMPUS_SHARPEN_FRAG = /* glsl */ `
     vec3 mn = min(c, min(min(n, s), min(e, w)));
     vec3 mx = max(c, max(max(n, s), max(e, w)));
 
-    // Adaptive gain reduces sharpening automatically across extreme high-contrast silhouettes to avoid ringing
     vec3 amp = clamp(min(mn, 1.0 - mx) / max(mx, vec3(1e-4)), 0.0, 1.0);
     amp = sqrt(amp);
     vec3 weight = amp * (-0.16 * uSharpness);
@@ -220,7 +204,7 @@ class CampusSharpenEffect extends Effect {
       blendFunction: BlendFunction.NORMAL,
       attributes: EffectAttribute.CONVOLUTION,
       uniforms: new Map<string, THREE.Uniform>([
-        ["uSharpness", new THREE.Uniform(0.2)],
+        ["uSharpness", new THREE.Uniform(0.22)],
       ]),
     });
   }
@@ -230,6 +214,10 @@ class CampusSharpenEffect extends Effect {
   }
 }
 
+/**
+ * Dynamically loaded ONLY in Enhanced Mode at `high` or `ultra` quality.
+ * Zero device-based artificial caps: all devices get identical full-spec quality.
+ */
 export class PostProcessingPipeline {
   public readonly composer: EffectComposer;
   private readonly normalPass: NormalPass;
@@ -240,7 +228,6 @@ export class PostProcessingPipeline {
   private readonly sharpenEffect: CampusSharpenEffect;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly maxMsaaSamples: number;
-  private readonly isMobileTier: boolean;
   private quality: QualityTier;
 
   constructor(
@@ -249,36 +236,23 @@ export class PostProcessingPipeline {
     camera: THREE.PerspectiveCamera,
     width: number,
     height: number,
-    quality: QualityTier,
-    isMobileTier = false
+    quality: QualityTier
   ) {
     this.camera = camera;
     this.quality = quality;
-    this.isMobileTier = isMobileTier;
     this.maxMsaaSamples = Math.min(4, renderer.capabilities.maxSamples || 0);
 
-    // Hardware WebGL2 MSAA delivers crisp subpixel edges without post-process SMAA texture blur;
-    // on mobile "smooth" tier keep MSAA at 0 to preserve 60fps & battery life.
     this.composer = new EffectComposer(renderer, {
       frameBufferType: THREE.HalfFloatType,
-      multisampling:
-        quality === "smooth"
-          ? isMobileTier
-            ? 0
-            : Math.min(2, this.maxMsaaSamples)
-          : isMobileTier && quality === "refined"
-            ? Math.min(2, this.maxMsaaSamples)
-            : this.maxMsaaSamples,
+      multisampling: this.maxMsaaSamples,
     });
 
     const renderPass = new RenderPass(scene, camera);
     this.composer.addPass(renderPass);
 
-    // NormalPass supplies smooth view-space normals to CampusRayTraceEffect when SSR/SSGI is active
     this.normalPass = new NormalPass(scene, camera);
     this.composer.addPass(this.normalPass);
 
-    // Tight full-resolution HiDPI architectural contact AO (must use drawingBufferSize, never CSS pixels!)
     const drawingSize = renderer.getDrawingBufferSize(new THREE.Vector2());
     this.n8aoPass = new N8AOPostPass(
       scene,
@@ -289,33 +263,31 @@ export class PostProcessingPipeline {
     this.n8aoPass.configuration.aoRadius = 0.95;
     this.n8aoPass.configuration.distanceFalloff = 1.0;
     this.n8aoPass.configuration.intensity = 1.35;
-    this.n8aoPass.configuration.halfRes = isMobileTier && quality === "smooth";
-    this.n8aoPass.configuration.gammaCorrection = false; // ToneMappingEffect handles final output encoding
+    this.n8aoPass.configuration.halfRes = false;
+    this.n8aoPass.configuration.gammaCorrection = false;
     this.composer.addPass(this.n8aoPass);
 
     this.rtEffect = new CampusRayTraceEffect(this.normalPass.texture);
 
-    // Full-resolution non-destructive selection/hover outline (0.5x scale on mobile for faster GPU fill)
     this.outlineEffect = new OutlineEffect(scene, camera, {
       blendFunction: BlendFunction.SCREEN,
       edgeStrength: 2.6,
       pulseSpeed: 0.0,
-      visibleEdgeColor: 0xf59e0b,
-      hiddenEdgeColor: 0x38bdf8,
+      visibleEdgeColor: 0x3b63fb,
+      hiddenEdgeColor: 0x60a5fa,
       multisampling: 0,
-      resolutionScale: isMobileTier ? 0.5 : 1.0,
+      resolutionScale: 1.0,
       blur: false,
       xRay: true,
     });
 
-    // High-threshold HDR Mipmap Bloom (daylight architecture stays razor-sharp; sunset & night lamps glow!)
     this.bloomEffect = new BloomEffect({
       mipmapBlur: true,
       luminanceThreshold: 1.65,
       luminanceSmoothing: 0.22,
       intensity: 0.18,
       radius: 0.42,
-      kernelSize: isMobileTier ? KernelSize.SMALL : KernelSize.MEDIUM,
+      kernelSize: KernelSize.MEDIUM,
     });
 
     const toneMappingEffect = new ToneMappingEffect({
@@ -331,72 +303,52 @@ export class PostProcessingPipeline {
     );
     this.composer.addPass(mainEffectPass);
 
-    // Post-tonemap Contrast-Adaptive Sharpening for ultra-crisp brickwork, mullions & engraved signage
     this.sharpenEffect = new CampusSharpenEffect();
     const sharpenPass = new EffectPass(camera, this.sharpenEffect);
     this.composer.addPass(sharpenPass);
 
     this.setQuality(quality);
-    // Sync all internal pass targets (including N8AOPostPass) to exact HiDPI drawingBufferSize
     this.composer.setSize(width, height, false);
   }
 
   public setQuality(quality: QualityTier): void {
     this.quality = quality;
-    if (quality === "smooth") {
-      this.composer.multisampling = this.isMobileTier
-        ? 0
-        : Math.min(2, this.maxMsaaSamples);
-      this.n8aoPass.setQualityMode("Performance");
-      this.n8aoPass.configuration.halfRes = this.isMobileTier;
-      this.n8aoPass.configuration.denoiseRadius = 4;
-      this.n8aoPass.configuration.aoRadius = 0.9;
-      this.n8aoPass.configuration.intensity = 1.1;
-      this.sharpenEffect.setSharpness(0.08);
-      this.normalPass.enabled = false;
-    } else if (quality === "refined") {
-      this.composer.multisampling = this.isMobileTier
-        ? Math.min(2, this.maxMsaaSamples)
-        : this.maxMsaaSamples;
-      this.n8aoPass.setQualityMode("Medium");
-      this.n8aoPass.configuration.halfRes = false;
-      this.n8aoPass.configuration.denoiseRadius = 4;
-      this.n8aoPass.configuration.aoRadius = 0.95;
-      this.n8aoPass.configuration.intensity = 1.35;
-      this.sharpenEffect.setSharpness(0.22);
-      this.normalPass.enabled = false; // Enabled dynamically only when wet rain puddles need SSR
-    } else {
-      // Ultra High Quality ("极致画质"): 4x MSAA + Ultra full-res N8AO + SSR/SSGI + crisp CAS sharpening
-      this.composer.multisampling = this.maxMsaaSamples;
+    this.composer.multisampling = this.maxMsaaSamples;
+    this.n8aoPass.configuration.halfRes = false;
+    this.n8aoPass.configuration.denoiseRadius = 4;
+    this.n8aoPass.configuration.aoRadius = 0.95;
+
+    if (quality === "ultra") {
       this.n8aoPass.setQualityMode("Ultra");
-      this.n8aoPass.configuration.halfRes = false;
-      this.n8aoPass.configuration.denoiseRadius = 4;
-      this.n8aoPass.configuration.aoRadius = 0.95;
       this.n8aoPass.configuration.intensity = 1.5;
       this.sharpenEffect.setSharpness(0.42);
       this.normalPass.enabled = true;
+    } else {
+      this.n8aoPass.setQualityMode("Medium");
+      this.n8aoPass.configuration.intensity = 1.35;
+      this.sharpenEffect.setSharpness(0.22);
+      this.normalPass.enabled = false;
     }
   }
 
   public setHighlightedObjects(objects: THREE.Object3D[], mode: "selected" | "hovered" | "none"): void {
     this.outlineEffect.selection.clear();
     if (mode === "none" || objects.length === 0) return;
-    this.outlineEffect.visibleEdgeColor.setHex(mode === "selected" ? 0xf59e0b : 0x38bdf8);
-    this.outlineEffect.hiddenEdgeColor.setHex(mode === "selected" ? 0xb45309 : 0x0284c7);
+    this.outlineEffect.visibleEdgeColor.setHex(mode === "selected" ? 0x3b63fb : 0x38bdf8);
+    this.outlineEffect.hiddenEdgeColor.setHex(mode === "selected" ? 0x2563eb : 0x0284c7);
     this.outlineEffect.selection.set(objects);
   }
 
   public updateFrame(wetness: number, nightFactor: number, twilightGlow: number): void {
-    const needWetSsr = this.quality !== "smooth" && wetness > 0.05;
-    const needSsgi = this.quality === "cinematic";
+    const needWetSsr = wetness > 0.05;
+    const needSsgi = this.quality === "ultra";
     this.normalPass.enabled = needWetSsr || needSsgi;
 
-    const ssrStrength = needWetSsr ? (this.quality === "cinematic" ? 1.0 : 0.8) : 0.0;
+    const ssrStrength = needWetSsr ? (this.quality === "ultra" ? 1.0 : 0.8) : 0.0;
     const ssgiStrength = needSsgi ? 0.65 : 0.0;
 
     this.rtEffect.sync(this.camera, wetness, nightFactor, ssrStrength, ssgiStrength);
 
-    // Keep daylight razor-sharp (high threshold 1.65, low intensity 0.16); let sunset & night lamps bloom gracefully
     this.bloomEffect.intensity = 0.16 + nightFactor * 0.44 + twilightGlow * 0.16;
     this.bloomEffect.luminanceMaterial.threshold = 1.65 - nightFactor * 0.58 - twilightGlow * 0.18;
   }
@@ -406,9 +358,6 @@ export class PostProcessingPipeline {
   }
 
   public setSize(width: number, height: number): void {
-    // EffectComposer automatically converts CSS width/height to HiDPI drawingBufferSize
-    // and forwards drawingBufferSize to every pass (including N8AOPostPass).
-    // Never overwrite n8aoPass.setSize with raw CSS pixels!
     this.composer.setSize(width, height, false);
   }
 
