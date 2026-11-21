@@ -9,10 +9,15 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "n8ao": "1.9.6",
     "next": "15.5.28",
+    "postprocessing": "6.39.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "three": "0.174.0"
+    "three": "0.174.0",
+    "three-gpu-pathtracer": "0.0.23",
+    "three-mesh-bvh": "0.7.8",
+    "xatlas-web": "0.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.0",

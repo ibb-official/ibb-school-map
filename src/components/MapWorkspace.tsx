@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CAMPUSES } from "@/data/campuses";
 import {
   CATEGORY_COLORS,
@@ -10,12 +10,13 @@ import {
 } from "@/data/places";
 import { getToursByCampus } from "@/data/tours";
 import {
+  AtmosphereState,
   CameraTourStop,
   CampusId,
-  LightingPreset,
   PlaceCategory,
   ViewMode,
 } from "@/data/types";
+import { getCurrentBeijingTimeHours, presetToTimeHours } from "@/scene/sunAstronomy";
 import { CameraTourBar } from "./CameraTourBar";
 import { CampusMap2D } from "./CampusMap2D";
 import { CampusScene3D } from "./CampusScene3D";
@@ -30,20 +31,23 @@ import {
   PinIcon,
   ResetIcon,
   SearchIcon,
-  SunIcon,
 } from "./Icons";
 import { PlaceDetailDrawer } from "./PlaceDetailDrawer";
 
-const LIGHTING_OPTIONS: { id: LightingPreset; label: string }[] = [
-  { id: "morning", label: "晨光" },
-  { id: "noon", label: "正午" },
-  { id: "sunset", label: "夕照" },
-];
+const INITIAL_ATMOSPHERE: AtmosphereState = {
+  // Deterministic SSR initial hour; immediately synced to live Beijing local time on client mount
+  timeHours: 9.5,
+  syncBeijingTime: true,
+  weather: "clear",
+  quality: "refined",
+  autoPlay: false,
+  pathTracingActive: false,
+};
 
 export function MapWorkspace() {
   const [campusId, setCampusId] = useState<CampusId>("west");
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
-  const [lightingPreset, setLightingPreset] = useState<LightingPreset>("morning");
+  const [atmosphere, setAtmosphere] = useState<AtmosphereState>(INITIAL_ATMOSPHERE);
   const [showPins, setShowPins] = useState<boolean>(true);
   const [directoryOpen, setDirectoryOpen] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -52,11 +56,32 @@ export function MapWorkspace() {
   const [activeTourId, setActiveTourId] = useState<string | null>("tour-w-overview");
   const [webglFallbackMsg, setWebglFallbackMsg] = useState<string | null>(null);
 
+  // Client hydration: sync default time to real Beijing local time & adapt layout/tier for mobile screens
   useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 860) {
+    if (typeof window === "undefined") return;
+    const isNarrow = window.innerWidth < 860;
+    if (isNarrow) {
       setDirectoryOpen(false);
     }
+    setAtmosphere((prev) => ({
+      ...prev,
+      timeHours: getCurrentBeijingTimeHours(),
+      quality: window.innerWidth < 768 ? "smooth" : prev.quality,
+    }));
   }, []);
+
+  // Keep Beijing clock synchronized every 30s while syncBeijingTime mode is active
+  useEffect(() => {
+    if (!atmosphere.syncBeijingTime) return;
+    const timer = window.setInterval(() => {
+      setAtmosphere((prev) =>
+        prev.syncBeijingTime
+          ? { ...prev, timeHours: getCurrentBeijingTimeHours() }
+          : prev
+      );
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [atmosphere.syncBeijingTime]);
 
   const [cameraFlight, setCameraFlight] = useState<{
     id: number;
@@ -89,6 +114,19 @@ export function MapWorkspace() {
     [selectedPlaceId]
   );
 
+  const handleAtmosphereChange = useCallback((patch: Partial<AtmosphereState>) => {
+    setAtmosphere((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const handleSyncBeijingNow = useCallback(() => {
+    setAtmosphere((prev) => ({
+      ...prev,
+      timeHours: getCurrentBeijingTimeHours(),
+      syncBeijingTime: true,
+      autoPlay: false,
+    }));
+  }, []);
+
   const triggerFlight = (
     cameraPos: [number, number, number],
     cameraTarget: [number, number, number]
@@ -108,6 +146,9 @@ export function MapWorkspace() {
     setSelectedPlaceId(null);
     setActiveTourId(nextCampus === "west" ? "tour-w-overview" : "tour-e-overview");
     setCameraFlight(null);
+    setAtmosphere((prev) =>
+      prev.pathTracingActive ? { ...prev, pathTracingActive: false } : prev
+    );
   };
 
   const handleSelectPlace = (placeId: string | null) => {
@@ -118,6 +159,9 @@ export function MapWorkspace() {
       setActiveTourId(null);
       if (place.campusId !== campusId) {
         setCampusId(place.campusId);
+        setAtmosphere((prev) =>
+          prev.pathTracingActive ? { ...prev, pathTracingActive: false } : prev
+        );
       }
       if (viewMode === "3d") {
         triggerFlight(place.cameraPos, place.cameraTarget);
@@ -128,7 +172,12 @@ export function MapWorkspace() {
   const handleSelectTour = (tour: CameraTourStop) => {
     setActiveTourId(tour.id);
     if (tour.lightingSuggestion) {
-      setLightingPreset(tour.lightingSuggestion);
+      setAtmosphere((prev) => ({
+        ...prev,
+        timeHours: presetToTimeHours(tour.lightingSuggestion!),
+        syncBeijingTime: false,
+        autoPlay: false,
+      }));
     }
     if (tour.highlightPlaceId) {
       setSelectedPlaceId(tour.highlightPlaceId);
@@ -146,6 +195,7 @@ export function MapWorkspace() {
 
   const handleWebGLError = (reason: string) => {
     setWebglFallbackMsg(reason);
+    setAtmosphere((prev) => ({ ...prev, pathTracingActive: false }));
     setViewMode("2d");
   };
 
@@ -188,6 +238,9 @@ export function MapWorkspace() {
                 onClick={() => {
                   setViewMode("overview");
                   setSelectedPlaceId(null);
+                  setAtmosphere((prev) =>
+                    prev.pathTracingActive ? { ...prev, pathTracingActive: false } : prev
+                  );
                 }}
               >
                 <MapLayersIcon size={14} />
@@ -212,7 +265,12 @@ export function MapWorkspace() {
                 <button
                   type="button"
                   className={`seg-btn ${viewMode === "2d" ? "seg-btn-active" : ""}`}
-                  onClick={() => setViewMode("2d")}
+                  onClick={() => {
+                    setAtmosphere((prev) =>
+                      prev.pathTracingActive ? { ...prev, pathTracingActive: false } : prev
+                    );
+                    setViewMode("2d");
+                  }}
                 >
                   <span>2D 平面图</span>
                 </button>
@@ -220,32 +278,6 @@ export function MapWorkspace() {
 
               {viewMode === "3d" && (
                 <>
-                  <div className="segmented-group" role="group" aria-label="日光时段">
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        padding: "0 6px",
-                        color: "#516175",
-                      }}
-                    >
-                      <SunIcon size={14} />
-                    </span>
-                    {LIGHTING_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        className={`seg-btn ${
-                          lightingPreset === opt.id ? "seg-btn-active" : ""
-                        }`}
-                        style={{ padding: "5px 9px", fontSize: "12px" }}
-                        onClick={() => setLightingPreset(opt.id)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-
                   <button
                     type="button"
                     className={`tool-btn ${showPins ? "tool-btn-active" : ""}`}
@@ -272,10 +304,12 @@ export function MapWorkspace() {
               campus={campus}
               places={allCampusPlaces}
               selectedPlaceId={selectedPlaceId}
-              lightingPreset={lightingPreset}
+              atmosphere={atmosphere}
               showPins={showPins}
               cameraFlightRequest={cameraFlight}
               onSelectPlace={handleSelectPlace}
+              onAtmosphereChange={handleAtmosphereChange}
+              onSyncBeijingNow={handleSyncBeijingNow}
               onWebGLError={handleWebGLError}
             />
           ) : (

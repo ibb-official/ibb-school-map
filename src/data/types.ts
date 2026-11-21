@@ -4,6 +4,23 @@ export type ViewMode = "3d" | "2d" | "overview";
 
 export type LightingPreset = "morning" | "noon" | "sunset";
 
+export type WeatherMode = "clear" | "cloudy" | "rainy" | "misty" | "snowy";
+
+export type QualityTier = "smooth" | "refined" | "cinematic";
+
+export interface AtmosphereState {
+  /** Continuous Beijing local time in hours [0, 24) */
+  timeHours: number;
+  /** Whether time automatically tracks live Beijing wall-clock time */
+  syncBeijingTime: boolean;
+  /** Whether time-lapse playback is active */
+  autoPlay: boolean;
+  weather: WeatherMode;
+  quality: QualityTier;
+  /** True GPU Monte Carlo path-tracing photo mode */
+  pathTracingActive: boolean;
+}
+
 export type PlaceCategory =
   | "gate"
   | "academic"
