@@ -92,6 +92,28 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
   {
     "kind": "sconce",
     "pos": [
+      -16.5,
+      0.08,
+      -57.55
+    ],
+    "color": "#ffdba8",
+    "intensity": 7.5,
+    "distance": 7.5
+  },
+  {
+    "kind": "sconce",
+    "pos": [
+      -51.0,
+      3.06,
+      -78.09
+    ],
+    "color": "#ffd8a0",
+    "intensity": 11.0,
+    "distance": 11.0
+  },
+  {
+    "kind": "sconce",
+    "pos": [
       -32.27,
       2.96,
       -38.88
@@ -104,7 +126,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -51.07,
-      6.08,
+      6.48,
       -128.2
     ],
     "color": "#ffe2b5",
@@ -115,7 +137,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -44.0,
-      6.08,
+      6.48,
       -128.2
     ],
     "color": "#ffe2b5",
@@ -126,7 +148,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -36.93,
-      6.08,
+      6.48,
       -128.2
     ],
     "color": "#ffe2b5",
@@ -137,7 +159,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -66.0,
-      3.08,
+      3.48,
       -135.95
     ],
     "color": "#ffd89c",
@@ -148,7 +170,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -56.0,
-      3.08,
+      3.48,
       -135.95
     ],
     "color": "#ffd89c",
@@ -159,7 +181,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -44.0,
-      3.08,
+      3.48,
       -135.95
     ],
     "color": "#ffd89c",
@@ -170,7 +192,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -32.0,
-      3.08,
+      3.48,
       -135.95
     ],
     "color": "#ffd89c",
@@ -181,7 +203,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -22.0,
-      3.08,
+      3.48,
       -135.95
     ],
     "color": "#ffd89c",
@@ -192,7 +214,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -12.0,
-      3.08,
+      3.48,
       -135.95
     ],
     "color": "#ffd89c",
@@ -203,7 +225,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -87.14,
-      3.5,
+      3.9,
       -125.75
     ],
     "color": "#ffd08a",
@@ -214,7 +236,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -87.14,
-      6.72,
+      7.12,
       -125.75
     ],
     "color": "#ffd08a",
@@ -225,7 +247,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -81.0,
-      3.5,
+      3.9,
       -125.75
     ],
     "color": "#ffd08a",
@@ -236,7 +258,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -81.0,
-      6.72,
+      7.12,
       -125.75
     ],
     "color": "#ffd08a",
@@ -247,7 +269,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -74.86,
-      3.5,
+      3.9,
       -125.75
     ],
     "color": "#ffd08a",
@@ -258,7 +280,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -74.86,
-      6.72,
+      7.12,
       -125.75
     ],
     "color": "#ffd08a",
@@ -269,7 +291,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -76.55,
-      2.76,
+      3.16,
       -134.55
     ],
     "color": "#ffd594",
@@ -456,12 +478,12 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       -93.2,
-      7.45,
+      7.85,
       -92.2
     ],
     "target": [
       -68.0,
-      0.0,
+      0.4,
       -103.0
     ],
     "color": "#eef5ff",
@@ -472,12 +494,12 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       -93.2,
-      7.45,
+      7.85,
       -107.6
     ],
     "target": [
       -65.0,
-      0.0,
+      0.4,
       -107.6
     ],
     "color": "#eef5ff",
@@ -488,12 +510,12 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       -93.2,
-      7.45,
+      7.85,
       -121.8
     ],
     "target": [
       -68.0,
-      0.0,
+      0.4,
       -112.0
     ],
     "color": "#eef5ff",
@@ -504,12 +526,12 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       -13.6,
-      7.45,
+      7.85,
       -107.6
     ],
     "target": [
       -42.0,
-      0.0,
+      0.4,
       -107.6
     ],
     "color": "#eef5ff",
@@ -555,8 +577,8 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -9.38,
-      3.48,
-      -80.98
+      3.58,
+      -81.08
     ],
     "color": "#ffd89c",
     "intensity": 12.0,
@@ -566,8 +588,8 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "sconce",
     "pos": [
       -3.73,
-      3.48,
-      -80.98
+      3.58,
+      -81.08
     ],
     "color": "#ffd89c",
     "intensity": 12.0,
@@ -588,7 +610,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       -5.4,
-      7.6,
+      7.9,
       15.4
     ],
     "target": [
@@ -604,7 +626,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       30.4,
-      7.6,
+      7.9,
       15.4
     ],
     "target": [
@@ -620,7 +642,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       -5.4,
-      7.6,
+      7.9,
       -18.4
     ],
     "target": [
@@ -636,7 +658,7 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "kind": "floodlight",
     "pos": [
       30.4,
-      7.6,
+      7.9,
       -18.4
     ],
     "target": [
@@ -647,6 +669,61 @@ export const CAMPUS_LIGHTS: Record<CampusId, CampusLightAnchor[]> = {
     "color": "#eef5ff",
     "intensity": 64.0,
     "distance": 46.0
+  },
+  {
+    "kind": "sconce",
+    "pos": [
+      8.59,
+      3.03,
+      17.14
+    ],
+    "color": "#ffd8a0",
+    "intensity": 11.0,
+    "distance": 11.0
+  },
+  {
+    "kind": "sconce",
+    "pos": [
+      -15.82,
+      3.03,
+      24.5
+    ],
+    "color": "#ffd8a0",
+    "intensity": 11.0,
+    "distance": 11.0
+  },
+  {
+    "kind": "sconce",
+    "pos": [
+      46.79,
+      3.03,
+      16.34
+    ],
+    "color": "#ffd8a0",
+    "intensity": 11.0,
+    "distance": 11.0
+  },
+  {
+    "kind": "sconce",
+    "pos": [
+      -13.88,
+      3.03,
+      3.3
+    ],
+    "color": "#ffd8a0",
+    "intensity": 11.0,
+    "distance": 11.0
+  },
+  {
+    "kind": "sconce",
+    "pos": [
+      36.26,
+      3.03,
+      -1.0
+    ],
+    "color": "#ffd8a0",
+    "intensity": 11.0,
+    "distance": 11.0
   },
   {
     "kind": "sconce",

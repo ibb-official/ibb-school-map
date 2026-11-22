@@ -16,8 +16,9 @@ blender/
     ├── render_foliage_and_atlases.swift   # (macOS CoreGraphics) 绘制 6 类植物枝叶卡图集与邻楼视差室内图集
     ├── bake_campus_atlases.mjs            # 为招牌/浮雕/枝叶卡批量烘焙 Sobel 切线空间法线贴图（WebP）
     ├── archviz_geometry.py                # 写实建模模块：米制平铺 UV、浅层 3D 室内教室、植物群落、雕塑/太湖石、夜景灯具
-    ├── generate_campus_glb.py             # 纯 Python glTF 2.0 (.glb) 增强模式（PBR）东西两校区生成器 + 自动产出 src/data/campusLights.ts
-    ├── generate_classic_glb.py            # 纯 Python glTF 2.0 (.glb) 普通/经典模式东西两校区生成器（无损 FLOAT32 顶点 + 零共面重叠）
+    ├── detailed_props.py                  # 高精度建筑细部与设施库：圆轮自行车、石质坡道护栏、镂空花槽、石砖路缘挡墙、飞檐中式亭、篮架/乒乓球台/拒马/建筑门厅
+    ├── generate_campus_glb.py             # 纯 Python glTF 2.0 (.glb) 东西两校区双版本（Enhanced + Classic）统一真源生成器 + 自动产出 src/data/campusLights.ts
+    ├── generate_classic_glb.py            # 普通/经典模式快捷入口（委托给 `generate_campus_glb.py --variant classic`，保留 FLOAT32 顶点 + 零双面重复面）
     ├── optimize_glb.mjs                   # @gltf-transform 网格焊点、去重与 KHR_mesh_quantization 压缩（`--preserve-positions` 保留 FLOAT32 顶点防 Z-fighting）
     └── build_in_blender.py                # Blender 4.x (`bpy`) 原生装配与 glTF 导出脚本
 ```
@@ -52,12 +53,12 @@ swift blender/scripts/render_foliage_and_atlases.swift /tmp/foliage_raw
 NODE_PATH="$HOME/.build/校园地图/tools/node_modules" node blender/scripts/bake_campus_atlases.mjs /tmp/glb_textures /tmp/foliage_raw
 ```
 
-2. 生成东西两校区 `.glb` 模型、更新 [src/data/campusLights.ts](../src/data/campusLights.ts) 与缓存版本哈希，并执行 `KHR_mesh_quantization` 网格量化压缩：
+2. 同步生成东西两校区增强版与经典版 `.glb` 模型（`--variant all|enhanced|classic`）、更新 [src/data/campusLights.ts](../src/data/campusLights.ts) 与 [src/data/campuses.ts](../src/data/campuses.ts) 版本哈希与体积，并执行 `KHR_mesh_quantization` 网格量化压缩（经典版自动附加 `--preserve-positions`）：
 
 ```bash
-export MAP_TEX_DIR=/tmp/glb_textures
+export MAP_TEX_DIR="$HOME/.build/校园地图/glb_textures"
 export NODE_PATH="$HOME/.build/校园地图/tools/node_modules"
-python3 blender/scripts/generate_campus_glb.py
+python3 blender/scripts/generate_campus_glb.py --campus all --variant all
 ```
 
 ### 方式 B：在 Blender 4.x 中交互编辑并导出

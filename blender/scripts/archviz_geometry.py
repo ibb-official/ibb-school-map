@@ -708,10 +708,12 @@ def add_botanical_tree(
     mats: dict,
     enu_to_gltf,
     seed_offset: int = 0,
+    z_base: float = 0.0,
 ) -> None:
     """
     Replaces crude low-poly spheres/cones with realistic multi-branch trunks and
     crossed alpha-cutout botanical foliage cluster cards with spherical smooth normals.
+    Supports arbitrary ground elevation `z_base` (e.g. elevated northern playground terrace).
     """
     seed = _room_hash(f"tree_{cx:.2f}_{cy_n:.2f}_{species}_{seed_offset}")
     bark_mat = mats["pbr_bark"]
@@ -789,26 +791,26 @@ def add_botanical_tree(
 
     if species == "rose":
         fmat = mats["foliage_rose"]
-        center = (cx, cy_n, h * 0.42)
+        center = (cx, cy_n, z_base + h * 0.42)
         for k in range(4):
             a = 2.0 * math.pi * k / 4.0 + rand01(k) * 0.5
             px = cx + 0.34 * math.cos(a)
             py = cy_n + 0.34 * math.sin(a)
-            add_foliage_cluster(fmat, px, py, h * 0.42, h * 0.48, h * 0.42, center, cards=3)
+            add_foliage_cluster(fmat, px, py, z_base + h * 0.42, h * 0.48, h * 0.42, center, cards=3)
         return
 
     # 1. Multi-segment subtly curving smooth trunk + primary boughs
     trunk_h = h * (0.28 if species in ("cedar", "pine") else 0.42)
     r_base = max(0.14, h * 0.028)
     r_mid = r_base * 0.68
-    nb.add_smooth_cylinder(bark_mat, cx, cy_n, 0.0, r_base, r_mid, trunk_h * 0.65, segs=10, ao_bot=0.64, ao_top=0.84)
+    nb.add_smooth_cylinder(bark_mat, cx, cy_n, z_base, r_base, r_mid, trunk_h * 0.65, segs=10, ao_bot=0.64, ao_top=0.84)
     lean_x = (rand01(3) - 0.5) * 0.16
     lean_y = (rand01(4) - 0.5) * 0.16
     nb.add_smooth_cylinder(
         bark_mat,
         cx + lean_x * 0.4,
         cy_n + lean_y * 0.4,
-        trunk_h * 0.62,
+        z_base + trunk_h * 0.62,
         r_mid,
         r_base * 0.38,
         trunk_h * 0.58,
@@ -820,8 +822,8 @@ def add_botanical_tree(
     if species == "cedar":
         # Himalayan Cedar (snow cedar): tall spire with 7 sweeping layered needle skirts
         fmat = mats["foliage_pine"]
-        nb.add_smooth_cylinder(bark_mat, cx, cy_n, trunk_h, r_base * 0.42, 0.05, h * 0.62, segs=8, ao_bot=0.72, ao_top=0.90)
-        cc = (cx, cy_n, h * 0.58)
+        nb.add_smooth_cylinder(bark_mat, cx, cy_n, z_base + trunk_h, r_base * 0.42, 0.05, h * 0.62, segs=8, ao_bot=0.72, ao_top=0.90)
+        cc = (cx, cy_n, z_base + h * 0.58)
         tiers = 7
         for ti in range(tiers):
             fz = 0.25 + ti * 0.105
@@ -831,14 +833,14 @@ def add_botanical_tree(
                 ang = (2.0 * math.pi * bi / n_boughs) + ti * 0.72
                 bx = cx + tr * 0.52 * math.cos(ang)
                 by = cy_n + tr * 0.52 * math.sin(ang)
-                add_foliage_cluster(fmat, bx, by, h * fz, tr * 0.78, tr * 0.46, cc, cards=3)
-        add_foliage_cluster(fmat, cx, cy_n, h * 0.94, h * 0.09, h * 0.10, cc, cards=3)
+                add_foliage_cluster(fmat, bx, by, z_base + h * fz, tr * 0.78, tr * 0.46, cc, cards=3)
+        add_foliage_cluster(fmat, cx, cy_n, z_base + h * 0.94, h * 0.09, h * 0.10, cc, cards=3)
         return
 
     if species == "pine":
         # Chinese Pine (青松): sculptural irregular layered dark needle pads
         fmat = mats["foliage_pine"]
-        cc = (cx + 0.18, cy_n, h * 0.66)
+        cc = (cx + 0.18, cy_n, z_base + h * 0.66)
         pads = [
             (-0.18, -0.10, 0.46, 0.28, 0.16),
             (0.22, 0.08, 0.56, 0.27, 0.16),
@@ -847,7 +849,7 @@ def add_botanical_tree(
             (0.05, 0.02, 0.88, 0.20, 0.14),
         ]
         for ox, oy, fz, rxy, rz in pads:
-            add_foliage_cluster(fmat, cx + ox * h, cy_n + oy * h, h * fz, h * rxy, h * rz, cc, cards=4)
+            add_foliage_cluster(fmat, cx + ox * h, cy_n + oy * h, z_base + h * fz, h * rxy, h * rz, cc, cards=4)
         return
 
     # Deciduous trees (broad, ginkgo, magnolia, persimmon)
@@ -862,13 +864,13 @@ def add_botanical_tree(
     for bi in range(3):
         ang = (2.0 * math.pi * bi / 3.0) + rand01(20 + bi) * 0.6
         b_len = h * 0.22
-        x0, y0, z0 = cx + lean_x * 0.5, cy_n + lean_y * 0.5, trunk_h * 0.95
+        x0, y0, z0 = cx + lean_x * 0.5, cy_n + lean_y * 0.5, z_base + trunk_h * 0.95
         x1 = x0 + math.cos(ang) * b_len * 0.75
         y1 = y0 + math.sin(ang) * b_len * 0.75
         z1 = z0 + b_len * 0.85
         nb.add_limb(bark_mat, (x0, y0, z0), (x1, y1, z1), r_base * 0.34, r_base * 0.14, segs=6)
 
-    cc = (cx, cy_n, h * 0.68)
+    cc = (cx, cy_n, z_base + h * 0.68)
     lobes = [
         (0.00, 0.00, 0.74, 0.30, 0.26),
         (-0.20, 0.07, 0.64, 0.25, 0.22),
@@ -884,7 +886,7 @@ def add_botanical_tree(
             fmat,
             cx + (ox + jx) * h,
             cy_n + (oy + jy) * h,
-            h * fz,
+            z_base + h * fz,
             h * rxy,
             h * rz,
             cc,
@@ -1117,14 +1119,23 @@ def add_courtyard_lamp(
     kind: str = "courtyard",
     z0: float = 0.0,
 ) -> None:
-    """Adds a sleek modern Beijing school courtyard lamp post and registers its runtime light anchor."""
-    # Granite base plinth + tapered dark-steel pole + warm frosted lantern head + rain cap
-    nb.add_box(mats["pbr_dark_slate"], x, y, z0, 0.30, 0.30, 0.24)
-    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z0 + 0.24, 0.068, 0.048, pole_h - 0.56, segs=10)
-    # Lantern glass diffuser cylinder
-    nb.add_smooth_cylinder(mats["lamp_warm"], x, y, z0 + pole_h - 0.34, 0.14, 0.16, 0.30, segs=10, ao_bot=1.0, ao_top=1.0)
-    # Flat dark-steel hood cap
-    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z0 + pole_h - 0.04, 0.24, 0.08, 0.08, segs=10)
+    """Adds an architectural Beijing school courtyard lamp post with stepped base, decorative collar & caged lantern."""
+    base_mat = mats["pbr_dark_slate"] if "pbr_dark_slate" in mats else mats["dark_steel"]
+    # Stepped dark granite pedestal + flanged base collar
+    nb.add_beveled_box(base_mat, x, y, z0, 0.36, 0.36, 0.18, bevel=0.025, ao_bot=0.72, ao_top=0.90)
+    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z0 + 0.18, 0.13, 0.09, 0.16, segs=10)
+    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z0 + 0.34, 0.068, 0.048, pole_h - 0.72, segs=10)
+    # Lantern lower dish collar + warm frosted glass diffuser cylinder + 4 slim protective cage ribs
+    z_lan = z0 + pole_h - 0.40
+    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z_lan - 0.04, 0.07, 0.16, 0.06, segs=10)
+    nb.add_smooth_cylinder(mats["lamp_warm"], x, y, z_lan + 0.02, 0.135, 0.155, 0.32, segs=10, ao_bot=1.0, ao_top=1.0)
+    for k in range(4):
+        ang = (math.pi * 0.5 * k) + math.pi * 0.25
+        rx, ry = x + 0.165 * math.cos(ang), y + 0.165 * math.sin(ang)
+        nb.add_limb(mats["dark_steel"], (rx, ry, z_lan), (rx, ry, z_lan + 0.35), 0.011, 0.011, segs=4)
+    # Two-tier overhanging conical rain hood + small finial spire
+    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z_lan + 0.34, 0.26, 0.10, 0.09, segs=10)
+    nb.add_smooth_cylinder(mats["dark_steel"], x, y, z_lan + 0.43, 0.06, 0.015, 0.08, segs=8)
     light_records.append(
         {
             "kind": kind,
