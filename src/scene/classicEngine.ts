@@ -155,8 +155,8 @@ export function mountClassicEngine(options: EngineMountOptions): CampusSceneEngi
     sunLight.shadow.camera.right = extent;
     sunLight.shadow.camera.top = extent;
     sunLight.shadow.camera.bottom = -extent;
-    sunLight.shadow.bias = -0.00045;
-    sunLight.shadow.normalBias = 0.025;
+    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.normalBias = 0.04;
   }
   scene.add(sunLight);
 
@@ -202,6 +202,36 @@ export function mountClassicEngine(options: EngineMountOptions): CampusSceneEngi
     hwMaxAniso
   );
 
+  const NON_SHADOW_CASTER_MATS = new Set([
+    "Mat_Skylight",
+    "Mat_WarmSunroom",
+    "Mat_WestDetailsAlpha",
+    "Mat_RockeryWater",
+    "Mat_WaterfallStream",
+    "Mat_FenceMesh",
+    "Mat_YellowHatch",
+    "Mat_HardCourtApron",
+    "Mat_BareSoil",
+  ]);
+
+  const configureClassicMeshShadow = (mesh: THREE.Mesh, enableShadows: boolean) => {
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    let hasTransparent = false;
+    let skipCast = false;
+    for (const mat of mats) {
+      if (!mat) continue;
+      if (mat.transparent) {
+        hasTransparent = true;
+        mat.depthWrite = false;
+      }
+      if (NON_SHADOW_CASTER_MATS.has(mat.name)) {
+        skipCast = true;
+      }
+    }
+    mesh.castShadow = enableShadows && !hasTransparent && !skipCast;
+    mesh.receiveShadow = enableShadows && !hasTransparent;
+  };
+
   const loader = new GLTFLoader();
   loader.load(
     campus.classicModelUrl,
@@ -217,8 +247,6 @@ export function mountClassicEngine(options: EngineMountOptions): CampusSceneEngi
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
-              mesh.castShadow = enableShadows;
-              mesh.receiveShadow = enableShadows;
               mesh.userData.placeId = placeId;
               selectableMeshes.push(mesh);
 
@@ -243,13 +271,12 @@ export function mountClassicEngine(options: EngineMountOptions): CampusSceneEngi
               } else if (mesh.material) {
                 mesh.material = cloneOne(mesh.material);
               }
+              configureClassicMeshShadow(mesh, enableShadows);
             }
           });
           nodeMaterials.set(placeId, clonedForNode);
         } else if ((obj as THREE.Mesh).isMesh && !obj.userData.placeId) {
           const mesh = obj as THREE.Mesh;
-          mesh.castShadow = enableShadows;
-          mesh.receiveShadow = enableShadows;
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           for (const mat of mats) {
             const std = mat as THREE.MeshStandardMaterial | undefined;
@@ -257,6 +284,7 @@ export function mountClassicEngine(options: EngineMountOptions): CampusSceneEngi
               std.map.anisotropy = targetAniso;
             }
           }
+          configureClassicMeshShadow(mesh, enableShadows);
         }
       });
 
@@ -389,6 +417,16 @@ export function mountClassicEngine(options: EngineMountOptions): CampusSceneEngi
     const dt = Math.min(clock.getDelta(), 0.05);
 
     nav.update(dt);
+
+    // Dynamically tighten camera.near with altitude/orbit distance to maximize 24-bit Z-buffer precision
+    const camDist = camera.position.distanceTo(nav.controls.target);
+    const camClearance = Math.min(camDist, Math.max(camera.position.y, 1.5));
+    const idealNear = THREE.MathUtils.clamp(camClearance * 0.04, 0.5, 4.0);
+    if (Math.abs(camera.near - idealNear) > 0.05) {
+      camera.near = idealNear;
+      camera.updateProjectionMatrix();
+    }
+
     renderer.render(scene, camera);
 
     updateCompassHeading(camera, nav.controls.target, compassDialRef.current);
