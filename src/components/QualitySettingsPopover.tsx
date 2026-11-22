@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Badge } from "@react-spectrum/s2/Badge";
 import { Button } from "@react-spectrum/s2/Button";
 import { CloseButton } from "@react-spectrum/s2/CloseButton";
@@ -23,7 +22,12 @@ import {
 interface QualitySettingsContentProps {
   campusId: CampusId;
   activeGraphics: GraphicsSettings;
+  draftGraphics: GraphicsSettings;
   prefs: MapUserPrefs;
+  onChangeDraftGraphics: (
+    updater: GraphicsSettings | ((prev: GraphicsSettings) => GraphicsSettings)
+  ) => void;
+  onResetDraftGraphics: () => void;
   onApplyGraphics: (next: GraphicsSettings) => void;
   onToggleTouchControls: (enabled: boolean) => void;
   onTogglePins: (enabled: boolean) => void;
@@ -34,19 +38,17 @@ interface QualitySettingsContentProps {
 export function QualitySettingsContent({
   campusId,
   activeGraphics,
+  draftGraphics,
   prefs,
+  onChangeDraftGraphics,
+  onResetDraftGraphics,
   onApplyGraphics,
   onToggleTouchControls,
   onTogglePins,
   onChangeColorScheme,
   onClose,
 }: QualitySettingsContentProps) {
-  const [draft, setDraft] = useState<GraphicsSettings>(activeGraphics);
-
-  useEffect(() => {
-    setDraft(activeGraphics);
-  }, [activeGraphics]);
-
+  const draft = draftGraphics;
   const isDirty = !graphicsSettingsEqual(draft, activeGraphics);
   const currentTierInfo =
     QUALITY_TIERS.find((t) => t.id === draft.quality) ?? QUALITY_TIERS[2];
@@ -61,7 +63,14 @@ export function QualitySettingsContent({
     <div className="settings-panel-body">
       <div className="settings-panel-header">
         <div>
-          <h2 className="settings-panel-title">画质与操控设置</h2>
+          <div className="settings-label-line">
+            <h2 className="settings-panel-title">画质与操控设置</h2>
+            {isDirty && (
+              <Badge variant="notice" fillStyle="subtle" size="S">
+                待应用
+              </Badge>
+            )}
+          </div>
           <p className="settings-panel-sub">设置将保存至本地，按画质按需加载对应资源</p>
         </div>
         {onClose && <CloseButton size="S" onPress={onClose} />}
@@ -91,7 +100,9 @@ export function QualitySettingsContent({
             isEmphasized
             aria-label="开启或关闭增强版地图"
             isSelected={draft.enhancedMap}
-            onChange={(val) => setDraft((prev) => ({ ...prev, enhancedMap: val }))}
+            onChange={(val) =>
+              onChangeDraftGraphics((prev) => ({ ...prev, enhancedMap: val }))
+            }
           />
         </div>
       </div>
@@ -114,7 +125,10 @@ export function QualitySettingsContent({
           selectedKey={draft.quality}
           onSelectionChange={(key) => {
             if (key === "low" || key === "medium" || key === "high" || key === "ultra") {
-              setDraft((prev) => ({ ...prev, quality: key as QualityTier }));
+              onChangeDraftGraphics((prev) => ({
+                ...prev,
+                quality: key as QualityTier,
+              }));
             }
           }}
         >
@@ -157,7 +171,7 @@ export function QualitySettingsContent({
                 variant="secondary"
                 fillStyle="outline"
                 size="M"
-                onPress={() => setDraft(activeGraphics)}
+                onPress={onResetDraftGraphics}
               >
                 还原
               </Button>

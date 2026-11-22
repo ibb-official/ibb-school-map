@@ -33,6 +33,7 @@ import { MOBILE_SHELL_MEDIA_QUERY } from "@/scene/deviceProfile";
 import type { PathTracerStatus } from "@/scene/pathTracerController";
 import {
   getDefaultUserPrefs,
+  graphicsSettingsEqual,
   loadUserPrefs,
   saveUserPrefs,
 } from "@/scene/prefs";
@@ -90,6 +91,13 @@ export function MapWorkspace() {
   // Preferences loaded synchronously before first WebGL engine mount (zero wasted double-load!)
   const [prefsReady, setPrefsReady] = useState<boolean>(false);
   const [prefs, setPrefs] = useState<MapUserPrefs>(getDefaultUserPrefs);
+  const [graphicsDraft, setGraphicsDraft] = useState<GraphicsSettings>(() => {
+    const defaults = getDefaultUserPrefs();
+    return {
+      enhancedMap: defaults.enhancedMap,
+      quality: defaults.quality,
+    };
+  });
 
   const [campusId, setCampusId] = useState<CampusId>("west");
   const [reloadNonce, setReloadNonce] = useState<number>(0);
@@ -131,6 +139,10 @@ export function MapWorkspace() {
     if (typeof window === "undefined") return;
     const loaded = loadUserPrefs();
     setPrefs(loaded);
+    setGraphicsDraft({
+      enhancedMap: loaded.enhancedMap,
+      quality: loaded.quality,
+    });
     setColorScheme(loaded.colorScheme);
     setPrefsReady(true);
 
@@ -204,6 +216,11 @@ export function MapWorkspace() {
     [prefs.enhancedMap, prefs.quality]
   );
 
+  const hasPendingGraphicsChanges = useMemo(
+    () => !graphicsSettingsEqual(graphicsDraft, activeGraphics),
+    [graphicsDraft, activeGraphics]
+  );
+
   const updatePrefs = useCallback((patch: Partial<MapUserPrefs>) => {
     setPrefs((prev) => {
       const next: MapUserPrefs = { ...prev, ...patch };
@@ -216,6 +233,10 @@ export function MapWorkspace() {
     (nextGraphics: GraphicsSettings) => {
       setWebglError(null);
       updatePrefs({
+        enhancedMap: nextGraphics.enhancedMap,
+        quality: nextGraphics.quality,
+      });
+      setGraphicsDraft({
         enhancedMap: nextGraphics.enhancedMap,
         quality: nextGraphics.quality,
       });
@@ -234,6 +255,10 @@ export function MapWorkspace() {
     },
     [updatePrefs]
   );
+
+  const handleResetDraftGraphics = useCallback(() => {
+    setGraphicsDraft(activeGraphics);
+  }, [activeGraphics]);
 
   const handleToggleTouchControls = useCallback(
     (enabled: boolean) => {
@@ -370,7 +395,10 @@ export function MapWorkspace() {
     <QualitySettingsContent
       campusId={campusId}
       activeGraphics={activeGraphics}
+      draftGraphics={graphicsDraft}
       prefs={prefs}
+      onChangeDraftGraphics={setGraphicsDraft}
+      onResetDraftGraphics={handleResetDraftGraphics}
       onApplyGraphics={handleApplyGraphics}
       onToggleTouchControls={handleToggleTouchControls}
       onTogglePins={handleTogglePins}
@@ -518,29 +546,42 @@ export function MapWorkspace() {
                 </TooltipTrigger>
               )}
 
-              <DialogTrigger
-                isOpen={desktopSettingsOpen}
-                onOpenChange={setDesktopSettingsOpen}
-              >
-                <TooltipTrigger>
-                  <ActionButton
-                    size="S"
-                    isQuiet
-                    aria-label="画质与操控设置"
-                  >
-                    <Settings />
-                  </ActionButton>
-                  <Tooltip>画质、增强版地图与操控设置</Tooltip>
-                </TooltipTrigger>
-                <Popover
-                  placement="bottom end"
-                  hideArrow
-                  padding="none"
-                  UNSAFE_className="s2-settings-popover"
+              <span className="hud-settings-btn-wrap">
+                <DialogTrigger
+                  isOpen={desktopSettingsOpen}
+                  onOpenChange={setDesktopSettingsOpen}
                 >
-                  {settingsContent(() => setDesktopSettingsOpen(false))}
-                </Popover>
-              </DialogTrigger>
+                  <TooltipTrigger>
+                    <ActionButton
+                      size="S"
+                      isQuiet
+                      aria-label={
+                        hasPendingGraphicsChanges
+                          ? "画质与操控设置（有未应用的画质修改）"
+                          : "画质与操控设置"
+                      }
+                    >
+                      <Settings />
+                    </ActionButton>
+                    <Tooltip>
+                      {hasPendingGraphicsChanges
+                        ? "画质设置存在未应用修改，点击查看或应用"
+                        : "画质、增强版地图与操控设置"}
+                    </Tooltip>
+                  </TooltipTrigger>
+                  <Popover
+                    placement="bottom end"
+                    hideArrow
+                    padding="none"
+                    UNSAFE_className="s2-settings-popover"
+                  >
+                    {settingsContent(() => setDesktopSettingsOpen(false))}
+                  </Popover>
+                </DialogTrigger>
+                {hasPendingGraphicsChanges && (
+                  <span className="hud-settings-dirty-dot" aria-hidden="true" />
+                )}
+              </span>
 
               <TooltipTrigger>
                 <ActionButton
@@ -556,16 +597,25 @@ export function MapWorkspace() {
             </div>
           ) : (
             <div className="hud-island hud-toolbar-island">
-              <ActionButton
-                size="S"
-                isQuiet
-                onPress={() =>
-                  setMobileSheet((prev) => (prev === "settings" ? "none" : "settings"))
-                }
-                aria-label="打开画质与操控设置"
-              >
-                <Settings />
-              </ActionButton>
+              <span className="hud-settings-btn-wrap">
+                <ActionButton
+                  size="S"
+                  isQuiet
+                  onPress={() =>
+                    setMobileSheet((prev) => (prev === "settings" ? "none" : "settings"))
+                  }
+                  aria-label={
+                    hasPendingGraphicsChanges
+                      ? "打开画质与操控设置（有未应用的画质修改）"
+                      : "打开画质与操控设置"
+                  }
+                >
+                  <Settings />
+                </ActionButton>
+                {hasPendingGraphicsChanges && (
+                  <span className="hud-settings-dirty-dot" aria-hidden="true" />
+                )}
+              </span>
             </div>
           )}
         </div>

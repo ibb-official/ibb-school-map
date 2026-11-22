@@ -11,6 +11,24 @@ interface TouchFlightControlsProps {
 const MAX_STICK_RADIUS = 34;
 const DEADZONE_RATIO = 0.12;
 
+function trySetPointerCapture(el: HTMLElement, pointerId: number): void {
+  try {
+    el.setPointerCapture(pointerId);
+  } catch {
+    // Some touch browsers may throw if pointer is synthetic or already released
+  }
+}
+
+function tryReleasePointerCapture(el: HTMLElement, pointerId: number): void {
+  try {
+    if (el.hasPointerCapture(pointerId)) {
+      el.releasePointerCapture(pointerId);
+    }
+  } catch {
+    // Ignore release errors on detached or already-released pointers
+  }
+}
+
 /**
  * Cross-platform virtual flight controls (usable with both touch multi-touch & desktop mouse):
  * - Bottom-left analog joystick -> horizontal plane flight (equivalent to WASD)
@@ -22,6 +40,8 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
   const [upHeld, setUpHeld] = useState<boolean>(false);
   const [downHeld, setDownHeld] = useState<boolean>(false);
 
+  const joystickRef = useRef<HTMLDivElement | null>(null);
+  const altitudeGroupRef = useRef<HTMLDivElement | null>(null);
   const stickPointerIdRef = useRef<number | null>(null);
   const stickCenterRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const upPointerIdRef = useRef<number | null>(null);
@@ -34,7 +54,64 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
     [inputRef]
   );
 
-  // Guarantee zero residual drift if component unmounts or window loses focus
+  const releaseStick = useCallback(() => {
+    stickPointerIdRef.current = null;
+    setStickActive(false);
+    setKnobOffset({ x: 0, y: 0 });
+    inputRef.current.moveX = 0;
+    inputRef.current.moveZ = 0;
+  }, [inputRef]);
+
+  const releaseUp = useCallback(() => {
+    upPointerIdRef.current = null;
+    setUpHeld(false);
+    syncVertical(false, downPointerIdRef.current !== null);
+  }, [syncVertical]);
+
+  const releaseDown = useCallback(() => {
+    downPointerIdRef.current = null;
+    setDownHeld(false);
+    syncVertical(upPointerIdRef.current !== null, false);
+  }, [syncVertical]);
+
+  // Block native browser touch/long-press gestures (iOS callout/loupe, Android long-press/contextmenu,
+  // drag, text selection) via non-passive DOM listeners without blocking Pointer Events.
+  useEffect(() => {
+    const targets = [joystickRef.current, altitudeGroupRef.current].filter(
+      (el): el is HTMLDivElement => el !== null
+    );
+    if (targets.length === 0) return;
+
+    const preventBrowserGesture = (ev: Event) => {
+      if (ev.cancelable) {
+        ev.preventDefault();
+      }
+    };
+
+    for (const el of targets) {
+      el.addEventListener("touchstart", preventBrowserGesture, { passive: false });
+      el.addEventListener("touchmove", preventBrowserGesture, { passive: false });
+      el.addEventListener("gesturestart", preventBrowserGesture, { passive: false });
+      el.addEventListener("gesturechange", preventBrowserGesture, { passive: false });
+      el.addEventListener("contextmenu", preventBrowserGesture);
+      el.addEventListener("selectstart", preventBrowserGesture);
+      el.addEventListener("dragstart", preventBrowserGesture);
+    }
+
+    return () => {
+      for (const el of targets) {
+        el.removeEventListener("touchstart", preventBrowserGesture);
+        el.removeEventListener("touchmove", preventBrowserGesture);
+        el.removeEventListener("gesturestart", preventBrowserGesture);
+        el.removeEventListener("gesturechange", preventBrowserGesture);
+        el.removeEventListener("contextmenu", preventBrowserGesture);
+        el.removeEventListener("selectstart", preventBrowserGesture);
+        el.removeEventListener("dragstart", preventBrowserGesture);
+      }
+    };
+  }, []);
+
+  // Guarantee zero residual drift if component unmounts, tab hides, window blurs, or pointer ends off-target
   useEffect(() => {
     const resetAll = () => {
       stickPointerIdRef.current = null;
@@ -48,12 +125,37 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
       inputRef.current.moveZ = 0;
       inputRef.current.moveY = 0;
     };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        resetAll();
+      }
+    };
+
+    const handleGlobalPointerEnd = (ev: PointerEvent) => {
+      if (stickPointerIdRef.current === ev.pointerId) {
+        releaseStick();
+      }
+      if (upPointerIdRef.current === ev.pointerId) {
+        releaseUp();
+      }
+      if (downPointerIdRef.current === ev.pointerId) {
+        releaseDown();
+      }
+    };
+
     window.addEventListener("blur", resetAll);
+    window.addEventListener("pointerup", handleGlobalPointerEnd);
+    window.addEventListener("pointercancel", handleGlobalPointerEnd);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.removeEventListener("blur", resetAll);
+      window.removeEventListener("pointerup", handleGlobalPointerEnd);
+      window.removeEventListener("pointercancel", handleGlobalPointerEnd);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       resetAll();
     };
-  }, [inputRef]);
+  }, [inputRef, releaseStick, releaseUp, releaseDown]);
 
   const updateStickFromClient = (clientX: number, clientY: number) => {
     const dx = clientX - stickCenterRef.current.x;
@@ -82,6 +184,8 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
   };
 
   const handleStickDown = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (ev.pointerType === "mouse" && ev.button !== 0) return;
+    ev.preventDefault();
     ev.stopPropagation();
     if (stickPointerIdRef.current !== null) return;
     const rect = ev.currentTarget.getBoundingClientRect();
@@ -91,12 +195,13 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
     };
     stickPointerIdRef.current = ev.pointerId;
     setStickActive(true);
-    ev.currentTarget.setPointerCapture(ev.pointerId);
+    trySetPointerCapture(ev.currentTarget, ev.pointerId);
     updateStickFromClient(ev.clientX, ev.clientY);
   };
 
   const handleStickMove = (ev: React.PointerEvent<HTMLDivElement>) => {
     if (stickPointerIdRef.current !== ev.pointerId) return;
+    ev.preventDefault();
     ev.stopPropagation();
     updateStickFromClient(ev.clientX, ev.clientY);
   };
@@ -104,20 +209,17 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
   const handleStickEnd = (ev: React.PointerEvent<HTMLDivElement>) => {
     if (stickPointerIdRef.current !== ev.pointerId) return;
     ev.stopPropagation();
-    stickPointerIdRef.current = null;
-    setStickActive(false);
-    setKnobOffset({ x: 0, y: 0 });
-    inputRef.current.moveX = 0;
-    inputRef.current.moveZ = 0;
-    if (ev.currentTarget.hasPointerCapture(ev.pointerId)) {
-      ev.currentTarget.releasePointerCapture(ev.pointerId);
-    }
+    releaseStick();
+    tryReleasePointerCapture(ev.currentTarget, ev.pointerId);
   };
 
   const handleUpDown = (ev: React.PointerEvent<HTMLButtonElement>) => {
+    if (ev.pointerType === "mouse" && ev.button !== 0) return;
+    ev.preventDefault();
     ev.stopPropagation();
+    if (upPointerIdRef.current !== null) return;
     upPointerIdRef.current = ev.pointerId;
-    ev.currentTarget.setPointerCapture(ev.pointerId);
+    trySetPointerCapture(ev.currentTarget, ev.pointerId);
     setUpHeld(true);
     syncVertical(true, downPointerIdRef.current !== null);
   };
@@ -125,18 +227,17 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
   const handleUpEnd = (ev: React.PointerEvent<HTMLButtonElement>) => {
     if (upPointerIdRef.current !== ev.pointerId) return;
     ev.stopPropagation();
-    upPointerIdRef.current = null;
-    setUpHeld(false);
-    syncVertical(false, downPointerIdRef.current !== null);
-    if (ev.currentTarget.hasPointerCapture(ev.pointerId)) {
-      ev.currentTarget.releasePointerCapture(ev.pointerId);
-    }
+    releaseUp();
+    tryReleasePointerCapture(ev.currentTarget, ev.pointerId);
   };
 
   const handleDownDown = (ev: React.PointerEvent<HTMLButtonElement>) => {
+    if (ev.pointerType === "mouse" && ev.button !== 0) return;
+    ev.preventDefault();
     ev.stopPropagation();
+    if (downPointerIdRef.current !== null) return;
     downPointerIdRef.current = ev.pointerId;
-    ev.currentTarget.setPointerCapture(ev.pointerId);
+    trySetPointerCapture(ev.currentTarget, ev.pointerId);
     setDownHeld(true);
     syncVertical(upPointerIdRef.current !== null, true);
   };
@@ -144,12 +245,8 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
   const handleDownEnd = (ev: React.PointerEvent<HTMLButtonElement>) => {
     if (downPointerIdRef.current !== ev.pointerId) return;
     ev.stopPropagation();
-    downPointerIdRef.current = null;
-    setDownHeld(false);
-    syncVertical(upPointerIdRef.current !== null, false);
-    if (ev.currentTarget.hasPointerCapture(ev.pointerId)) {
-      ev.currentTarget.releasePointerCapture(ev.pointerId);
-    }
+    releaseDown();
+    tryReleasePointerCapture(ev.currentTarget, ev.pointerId);
   };
 
   return (
@@ -157,11 +254,16 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
       {/* Bottom-Left Analog Virtual Joystick (WASD equivalent) */}
       <div className="vpad-joystick-anchor" aria-label="平面移动虚拟摇杆">
         <div
+          ref={joystickRef}
           className={`vpad-joystick-base${stickActive ? " vpad-joystick-active" : ""}`}
+          draggable={false}
           onPointerDown={handleStickDown}
           onPointerMove={handleStickMove}
           onPointerUp={handleStickEnd}
           onPointerCancel={handleStickEnd}
+          onLostPointerCapture={handleStickEnd}
+          onContextMenu={(e) => e.preventDefault()}
+          onDragStart={(e) => e.preventDefault()}
           role="application"
           aria-label="拖动摇杆进行前后左右移动"
         >
@@ -179,16 +281,23 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
       </div>
 
       {/* Bottom-Right Vertical Altitude Controls (Space / Shift equivalent) */}
-      <div className="vpad-altitude-anchor" role="group" aria-label="视角升降控制">
+      <div
+        ref={altitudeGroupRef}
+        className="vpad-altitude-anchor"
+        role="group"
+        aria-label="视角升降控制"
+      >
         <button
           type="button"
           className={`vpad-alt-btn${upHeld ? " vpad-alt-btn-active" : ""}`}
+          draggable={false}
           onPointerDown={handleUpDown}
           onPointerUp={handleUpEnd}
           onPointerCancel={handleUpEnd}
+          onLostPointerCapture={handleUpEnd}
           onContextMenu={(e) => e.preventDefault()}
-          aria-label="按住上升视角"
-          title="按住上升（等同 Space）"
+          onDragStart={(e) => e.preventDefault()}
+          aria-label="按住上升视角（等同 Space）"
         >
           <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
             <path
@@ -204,12 +313,14 @@ export function TouchFlightControls({ inputRef }: TouchFlightControlsProps) {
         <button
           type="button"
           className={`vpad-alt-btn${downHeld ? " vpad-alt-btn-active" : ""}`}
+          draggable={false}
           onPointerDown={handleDownDown}
           onPointerUp={handleDownEnd}
           onPointerCancel={handleDownEnd}
+          onLostPointerCapture={handleDownEnd}
           onContextMenu={(e) => e.preventDefault()}
-          aria-label="按住下降视角"
-          title="按住下降（等同 Shift）"
+          onDragStart={(e) => e.preventDefault()}
+          aria-label="按住下降视角（等同 Shift）"
         >
           <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
             <path
