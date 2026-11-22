@@ -160,20 +160,18 @@ export class PathTracerController {
     skyDome: THREE.Object3D,
     sample: SolarAtmosphereSample,
     onStatus: (status: PathTracerStatus) => void,
-    mobileSafeMode = false
+    quality: "low" | "medium" | "high" | "ultra" = "high"
   ): Promise<boolean> {
     if (this.active) return true;
-    this.mobileSafeMode = mobileSafeMode;
-    if (mobileSafeMode) {
-      this.targetSamples = 64;
-    }
+    const isLight = quality === "low" || quality === "medium";
+    this.mobileSafeMode = isLight;
+    this.targetSamples = quality === "ultra" ? 256 : quality === "high" ? 128 : 64;
     onStatus({ phase: "building", samples: 0, targetSamples: this.targetSamples, message: "正在构建光线追踪 BVH 加速结构..." });
 
     try {
       const mod = await import("three-gpu-pathtracer");
       const { WebGLPathTracer: PTClass } = mod;
 
-      // Prepare scene geometry & hide giant shader sky dome (replaced by MIS Equirectangular HDR sky)
       normalizeGeometryForPathTracer(loadedRoot);
       this.skyDomeRef = skyDome;
       skyDome.visible = false;
@@ -185,8 +183,8 @@ export class PathTracerController {
       if (this.equirectEnv) this.equirectEnv.dispose();
       this.equirectEnv = buildEquirectSkyDataTexture(
         sample,
-        mobileSafeMode ? 256 : 512,
-        mobileSafeMode ? 128 : 256
+        isLight ? 256 : 512,
+        isLight ? 128 : 256
       );
       scene.environment = this.equirectEnv;
       scene.background = this.equirectEnv;
@@ -194,18 +192,14 @@ export class PathTracerController {
       if (!this.tracer) {
         this.tracer = new PTClass(renderer);
       }
-      this.tracer.bounces = mobileSafeMode ? 2 : 4;
-      this.tracer.transmissiveBounces = mobileSafeMode ? 2 : 4;
+      this.tracer.bounces = quality === "ultra" ? 4 : quality === "high" ? 3 : 2;
+      this.tracer.transmissiveBounces = quality === "ultra" ? 4 : quality === "high" ? 3 : 2;
       this.tracer.multipleImportanceSampling = true;
       this.tracer.filterGlossyFactor = 0.5;
       this.tracer.dynamicLowRes = true;
-      this.tracer.lowResScale = mobileSafeMode ? 0.35 : 0.45;
-      this.tracer.renderScale = mobileSafeMode ? 0.65 : 1.0;
-      if (mobileSafeMode) {
-        this.tracer.tiles.set(3, 3);
-      } else {
-        this.tracer.tiles.set(2, 2);
-      }
+      this.tracer.lowResScale = isLight ? 0.4 : 0.48;
+      this.tracer.renderScale = isLight ? 0.75 : 1.0;
+      this.tracer.tiles.set(2, 2);
 
       await this.tracer.setSceneAsync(scene, camera, {
         onProgress: (p: number) => {

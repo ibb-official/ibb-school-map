@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { QualityTier } from "@/data/types";
 
 export interface GlobalShaderUniforms {
   uTime: { value: number };
@@ -125,10 +126,6 @@ const INT_GLOW_BUCKET_MAP: Record<string, number> = {
   Mat_IntGlow_6: 6,
 };
 
-/**
- * Injects physically coupled Rain Wetness (with procedural puddles & micro-ripples)
- * and Winter Snow Accumulation (slope-weighted world normal.y) into MeshStandard/PhysicalMaterial.
- */
 function injectWeatherSurfaceShader(
   mat: THREE.MeshStandardMaterial,
   shared: GlobalShaderUniforms,
@@ -186,15 +183,12 @@ function injectWeatherSurfaceShader(
         #include <color_fragment>
         vec3 cNoise = texture2D(uPuddleNoise, vCampusWorldPos.xz * 0.035).rgb;
         float upMask = smoothstep(0.55, 0.88, vCampusWorldNorm.y);
-        // Wet darkening of porous brick/stone/asphalt when raining
         if (uWetness > 0.01) {
           float wetPorosity = mix(0.68, 0.52, upMask);
           diffuseColor.rgb *= mix(1.0, wetPorosity + 0.14 * cNoise.g, uWetness);
         }
-        // Subtle natural wall-base grime & weathering variation
         float baseAO = smoothstep(0.0, 1.6, vCampusWorldPos.y);
         diffuseColor.rgb *= mix(0.88 + 0.08 * cNoise.b, 1.0, baseAO);
-        // Winter snow blanket on upward-facing roofs, ground, sills & tree crowns
         if (uSnow > 0.01 && uSnowWeight > 0.01) {
           float snowMask = smoothstep(0.42, 0.78, vCampusWorldNorm.y + (cNoise.r - 0.5) * 0.25) * uSnow * uSnowWeight;
           vec3 snowAlbedo = vec3(0.92, 0.95, 0.99);
@@ -210,7 +204,6 @@ function injectWeatherSurfaceShader(
           vec3 wNoise = texture2D(uPuddleNoise, vCampusWorldPos.xz * 0.035).rgb;
           float upFace = smoothstep(0.62, 0.92, vCampusWorldNorm.y);
           float puddle = smoothstep(0.46, 0.66, wNoise.r) * upFace * uWetness * uPuddleWeight;
-          // Damp surfaces become glossier; standing puddles become mirror-smooth
           roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.42, uWetness * 0.85);
           roughnessFactor = mix(roughnessFactor, 0.055, puddle);
         }
@@ -224,10 +217,6 @@ function injectWeatherSurfaceShader(
   };
 }
 
-/**
- * Keeps botanical foliage cards completely stationary (zero spinning/twisting)
- * while still supporting crisp winter snow accumulation on upper crown faces.
- */
 function injectFoliageShader(
   mat: THREE.MeshStandardMaterial,
   shared: GlobalShaderUniforms
@@ -274,11 +263,6 @@ function injectFoliageShader(
   };
 }
 
-/**
- * Creates a GLSL Parallax Interior Mapping material for surrounding context buildings
- * (`Context_West`, `Context_East`) so neighbor apartments and schools exhibit realistic
- * depth and warm scattered nighttime room lights with zero extra geometry overhead.
- */
 function createContextParallaxWindowMaterial(
   interiorAtlas: THREE.Texture,
   shared: GlobalShaderUniforms
@@ -333,7 +317,6 @@ function createContextParallaxWindowMaterial(
         "#include <emissivemap_fragment>",
         /* glsl */ `
         #include <emissivemap_fragment>
-        // Identify distinct apartment/classroom window cell in world space
         vec2 winCoord = vec2(
           (abs(vCtxWorldNorm.x) > 0.5 ? vCtxWorldPos.z : vCtxWorldPos.x) * 0.42,
           vCtxWorldPos.y * 0.34
@@ -341,7 +324,6 @@ function createContextParallaxWindowMaterial(
         vec2 cellId = floor(winCoord);
         vec2 localUv = fract(winCoord);
 
-        // Simple tangent-space parallax shift for 3D room depth illusion
         vec3 viewW = normalize(vCtxWorldPos - cameraPosition);
         vec3 rightAxis = normalize(cross(vec3(0.0, 1.0, 0.0), vCtxWorldNorm + vec3(0.0001)));
         vec3 upAxis = normalize(cross(vCtxWorldNorm, rightAxis));
@@ -355,7 +337,6 @@ function createContextParallaxWindowMaterial(
         vec2 atlasUv = (vec2(colIdx, rowIdx) + roomUv) * 0.25;
         vec3 roomCol = texture2D(uInteriorAtlas, atlasUv).rgb;
 
-        // Randomly lit rooms at dusk/night (~58% occupied warm apartments)
         float litThreshold = mix(0.95, 0.36, uNightFactor);
         float isLit = smoothstep(litThreshold, litThreshold + 0.08, rnd) * smoothstep(0.08, 0.65, uNightFactor);
         vec3 warmTint = mix(vec3(1.0, 0.78, 0.48), vec3(0.92, 0.94, 1.0), step(0.84, fract(rnd * 7.1)));
@@ -366,16 +347,40 @@ function createContextParallaxWindowMaterial(
   return mat;
 }
 
+/**
+ * Resource-gated PBR Material System for Enhanced Mode:
+ * - low:    loads ONLY albedo + foliage albedo (~2.8 MB); skips normal, ORM, env, campus normals, weather shader
+ * - medium: adds normal maps + env maps + weather/parallax shaders (~7.2 MB); skips ORM maps (~1.3 MB saved)
+ * - high:   loads full PBR (albedo + normal + ORM) with 8x anisotropy
+ * - ultra:  loads full PBR with maximum hardware anisotropy (unrestricted on all devices)
+ */
 export class PBRMaterialSystem {
   private readonly loader = new THREE.TextureLoader();
   private readonly textureCache = new Map<string, THREE.Texture>();
   private readonly maxAnisotropy: number;
+  private readonly loadNormals: boolean;
+  private readonly loadOrm: boolean;
+  private readonly loadEnvTextures: boolean;
+  private readonly usePhysicalShaders: boolean;
   public readonly sharedUniforms: GlobalShaderUniforms;
 
-  constructor(renderer: THREE.WebGLRenderer, maxAnisotropyCap = 16) {
-    this.maxAnisotropy = Math.min(maxAnisotropyCap, renderer.capabilities.getMaxAnisotropy());
-    const puddleNoise = this.loadTex("/textures/env/puddle_noise.webp", false, true);
-    const waterNormal = this.loadTex("/textures/env/water_normal.webp", false, true);
+  constructor(renderer: THREE.WebGLRenderer, quality: QualityTier) {
+    const hwMaxAniso = renderer.capabilities.getMaxAnisotropy();
+    const anisoCap =
+      quality === "low" ? 1 : quality === "medium" ? 4 : quality === "high" ? 8 : hwMaxAniso;
+    this.maxAnisotropy = Math.min(anisoCap, hwMaxAniso);
+
+    this.loadNormals = quality !== "low";
+    this.loadOrm = quality === "high" || quality === "ultra";
+    this.loadEnvTextures = quality !== "low";
+    this.usePhysicalShaders = quality !== "low";
+
+    const puddleNoise = this.loadEnvTextures
+      ? this.loadTex("/textures/env/puddle_noise.webp", false, true)
+      : null;
+    const waterNormal = this.loadEnvTextures
+      ? this.loadTex("/textures/env/water_normal.webp", false, true)
+      : null;
 
     this.sharedUniforms = {
       uTime: { value: 0 },
@@ -398,17 +403,12 @@ export class PBRMaterialSystem {
     tex.wrapS = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
     tex.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
     tex.anisotropy = this.maxAnisotropy;
-    tex.flipY = false; // glTF UV convention
+    tex.flipY = false;
     tex.needsUpdate = true;
     this.textureCache.set(key, tex);
     return tex;
   }
 
-  /**
-   * Upgrades every material on a loaded campus GLB scene into physically based PBR
-   * materials with photogrammetry Normal/ORM maps, physical transparent glass,
-   * botanical foliage cards, animated water, and dynamic weather shaders.
-   */
   public upgradeLoadedScene(root: THREE.Object3D): UpgradedMaterialBuckets {
     const buckets: UpgradedMaterialBuckets = {
       interiorLights: new Map(),
@@ -428,8 +428,10 @@ export class PBRMaterialSystem {
     }
 
     const upgradedByName = new Map<string, THREE.Material>();
-    const interiorAtlas = this.loadTex("/textures/env/interior_atlas.webp", true, false);
-    const waterNormal = this.sharedUniforms.uWaterNormal.value!;
+    const interiorAtlas = this.loadEnvTextures
+      ? this.loadTex("/textures/env/interior_atlas.webp", true, false)
+      : null;
+    const waterNormal = this.sharedUniforms.uWaterNormal.value;
 
     const upgradeOne = (orig: THREE.Material): THREE.Material => {
       const name = orig.name || "";
@@ -439,48 +441,46 @@ export class PBRMaterialSystem {
 
       const stdOrig = orig as THREE.MeshStandardMaterial;
 
-      // 1. Semantic photogrammetry PBR surfaces (brick, stone, plaster, marble, roof, track, grass, bark, wood)
+      // 1. Semantic photogrammetry PBR surfaces (strictly gated by quality tier)
       const pbrSpec = PBR_MATERIAL_MAP[name];
       if (pbrSpec) {
         const baseUrl = `/textures/pbr/${pbrSpec.folder}`;
         const albedo = this.loadTex(`${baseUrl}/albedo.webp`, true, true);
-        const normal = this.loadTex(`${baseUrl}/normal.webp`, false, true);
-        const orm = this.loadTex(`${baseUrl}/orm.webp`, false, true);
+        const normal = this.loadNormals ? this.loadTex(`${baseUrl}/normal.webp`, false, true) : null;
+        const orm = this.loadOrm ? this.loadTex(`${baseUrl}/orm.webp`, false, true) : null;
 
-        const usePhysical = pbrSpec.clearcoat !== undefined;
+        const usePhysical = this.usePhysicalShaders && pbrSpec.clearcoat !== undefined;
+        const commonParams: THREE.MeshStandardMaterialParameters = {
+          name,
+          color: new THREE.Color(pbrSpec.tint ?? 0xffffff),
+          map: albedo,
+          roughness: pbrSpec.roughness ?? 0.9,
+          metalness: pbrSpec.metalness ?? 0.0,
+          vertexColors: Boolean(stdOrig.vertexColors),
+        };
+        if (normal) {
+          commonParams.normalMap = normal;
+          commonParams.normalScale = new THREE.Vector2(
+            pbrSpec.normalScale ?? 1.0,
+            pbrSpec.normalScale ?? 1.0
+          );
+        }
+        if (orm) {
+          commonParams.aoMap = orm;
+          commonParams.aoMapIntensity = pbrSpec.aoIntensity ?? 0.75;
+          commonParams.roughnessMap = orm;
+          commonParams.metalnessMap = orm;
+        }
+
         const mat = usePhysical
           ? new THREE.MeshPhysicalMaterial({
-              name,
-              color: new THREE.Color(pbrSpec.tint ?? 0xffffff),
-              map: albedo,
-              normalMap: normal,
-              normalScale: new THREE.Vector2(pbrSpec.normalScale ?? 1.0, pbrSpec.normalScale ?? 1.0),
-              aoMap: orm,
-              aoMapIntensity: pbrSpec.aoIntensity ?? 0.75,
-              roughnessMap: orm,
-              roughness: pbrSpec.roughness ?? 0.9,
-              metalnessMap: orm,
-              metalness: pbrSpec.metalness ?? 0.0,
+              ...commonParams,
               clearcoat: pbrSpec.clearcoat ?? 0,
               clearcoatRoughness: pbrSpec.clearcoatRoughness ?? 0.2,
-              vertexColors: Boolean(stdOrig.vertexColors),
             })
-          : new THREE.MeshStandardMaterial({
-              name,
-              color: new THREE.Color(pbrSpec.tint ?? 0xffffff),
-              map: albedo,
-              normalMap: normal,
-              normalScale: new THREE.Vector2(pbrSpec.normalScale ?? 1.0, pbrSpec.normalScale ?? 1.0),
-              aoMap: orm,
-              aoMapIntensity: pbrSpec.aoIntensity ?? 0.75,
-              roughnessMap: orm,
-              roughness: pbrSpec.roughness ?? 0.9,
-              metalnessMap: orm,
-              metalness: pbrSpec.metalness ?? 0.0,
-              vertexColors: Boolean(stdOrig.vertexColors),
-            });
+          : new THREE.MeshStandardMaterial(commonParams);
 
-        if (pbrSpec.allowWeather) {
+        if (this.loadEnvTextures && pbrSpec.allowWeather) {
           const isGroundOrRoof =
             name.includes("Plaza") ||
             name.includes("Asphalt") ||
@@ -498,17 +498,18 @@ export class PBRMaterialSystem {
         return mat;
       }
 
-      // 2. Botanical alpha-cutout foliage cluster cards
+      // 2. Botanical alpha-cutout foliage cluster cards (albedo always needed for alpha cutout; normal gated)
       const folSpec = FOLIAGE_MATERIAL_MAP[name];
       if (folSpec) {
         const albedo = this.loadTex(`/textures/foliage/${folSpec.file}_albedo.webp`, true, false);
-        const normal = this.loadTex(`/textures/foliage/${folSpec.file}_normal.webp`, false, false);
+        const normal = this.loadNormals
+          ? this.loadTex(`/textures/foliage/${folSpec.file}_normal.webp`, false, false)
+          : null;
         const mat = new THREE.MeshStandardMaterial({
           name,
           color: new THREE.Color(folSpec.tint),
           map: albedo,
-          normalMap: normal,
-          normalScale: new THREE.Vector2(0.85, 0.85),
+          ...(normal ? { normalMap: normal, normalScale: new THREE.Vector2(0.85, 0.85) } : {}),
           roughness: 0.74,
           metalness: 0.0,
           alphaTest: 0.42,
@@ -521,101 +522,145 @@ export class PBRMaterialSystem {
         return mat;
       }
 
-      // 3. Physical transparent campus architectural glass
+      // 3. Campus architectural glass
       if (name === "Mat_Glass_Physical" || name === "Mat_WarmGlass_Physical") {
         const isWarm = name === "Mat_WarmGlass_Physical";
-        const mat = new THREE.MeshPhysicalMaterial({
-          name,
-          color: new THREE.Color(isWarm ? 0xf7e7c8 : 0xc6dff0),
-          roughness: 0.06,
-          metalness: 0.05,
-          ior: 1.5,
-          reflectivity: 0.92,
-          clearcoat: 1.0,
-          clearcoatRoughness: 0.04,
-          transparent: true,
-          opacity: isWarm ? 0.42 : 0.32,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-          envMapIntensity: 1.45,
-        });
+        const mat = this.usePhysicalShaders
+          ? new THREE.MeshPhysicalMaterial({
+              name,
+              color: new THREE.Color(isWarm ? 0xf7e7c8 : 0xc6dff0),
+              roughness: 0.06,
+              metalness: 0.05,
+              ior: 1.5,
+              reflectivity: 0.92,
+              clearcoat: 1.0,
+              clearcoatRoughness: 0.04,
+              transparent: true,
+              opacity: isWarm ? 0.42 : 0.32,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+              envMapIntensity: 1.45,
+            })
+          : new THREE.MeshStandardMaterial({
+              name,
+              color: new THREE.Color(isWarm ? 0xf7e7c8 : 0xc6dff0),
+              roughness: 0.14,
+              metalness: 0.1,
+              transparent: true,
+              opacity: isWarm ? 0.44 : 0.34,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            });
         upgradedByName.set(name, mat);
         buckets.disposables.materials.add(mat);
         return mat;
       }
 
-      // 4. Context surrounding building windows -> Parallax 3D Interior Shader
+      // 4. Context surrounding building windows
       if (name === "Mat_Context_Window") {
-        const mat = createContextParallaxWindowMaterial(interiorAtlas, this.sharedUniforms);
+        const mat = interiorAtlas
+          ? createContextParallaxWindowMaterial(interiorAtlas, this.sharedUniforms)
+          : new THREE.MeshStandardMaterial({
+              name: "Mat_Context_Window",
+              color: new THREE.Color(0x7c97b2),
+              roughness: 0.25,
+              metalness: 0.1,
+            });
         upgradedByName.set(name, mat);
         buckets.disposables.materials.add(mat);
         return mat;
       }
 
-      // 5. Tensile stage canopy -> luminous architectural PTFE membrane with subtle sheen
+      // 5. Tensile stage canopy
       if (name === "Mat_TensileMembrane") {
-        const mat = new THREE.MeshPhysicalMaterial({
-          name,
-          color: new THREE.Color(0xf6f8fb),
-          roughness: 0.44,
-          metalness: 0.0,
-          sheen: 0.65,
-          sheenRoughness: 0.55,
-          sheenColor: new THREE.Color(0xfff4e6),
-          side: THREE.DoubleSide,
-          vertexColors: Boolean(stdOrig.vertexColors),
-        });
-        injectWeatherSurfaceShader(mat, this.sharedUniforms, 0.85, 0.25);
+        const mat = this.usePhysicalShaders
+          ? new THREE.MeshPhysicalMaterial({
+              name,
+              color: new THREE.Color(0xf6f8fb),
+              roughness: 0.44,
+              metalness: 0.0,
+              sheen: 0.65,
+              sheenRoughness: 0.55,
+              sheenColor: new THREE.Color(0xfff4e6),
+              side: THREE.DoubleSide,
+              vertexColors: Boolean(stdOrig.vertexColors),
+            })
+          : new THREE.MeshStandardMaterial({
+              name,
+              color: new THREE.Color(0xf6f8fb),
+              roughness: 0.5,
+              metalness: 0.0,
+              side: THREE.DoubleSide,
+              vertexColors: Boolean(stdOrig.vertexColors),
+            });
+        if (this.loadEnvTextures) {
+          injectWeatherSurfaceShader(mat, this.sharedUniforms, 0.85, 0.25);
+        }
         upgradedByName.set(name, mat);
         buckets.disposables.materials.add(mat);
         return mat;
       }
 
-      // 6. Rockery reflective pool water -> animated dual-octave ripple normal map + crisp Fresnel reflection
+      // 6. Rockery pool & waterfall water
       if (name === "Mat_RockeryWater" || name === "Mat_WaterfallStream") {
         const isPool = name === "Mat_RockeryWater";
-        const wNormClone = waterNormal.clone();
-        wNormClone.wrapS = THREE.RepeatWrapping;
-        wNormClone.wrapT = THREE.RepeatWrapping;
-        wNormClone.repeat.set(isPool ? 3.5 : 2.0, isPool ? 3.5 : 4.0);
-        wNormClone.needsUpdate = true;
-        buckets.disposables.textures.add(wNormClone);
+        if (waterNormal && this.usePhysicalShaders) {
+          const wNormClone = waterNormal.clone();
+          wNormClone.wrapS = THREE.RepeatWrapping;
+          wNormClone.wrapT = THREE.RepeatWrapping;
+          wNormClone.repeat.set(isPool ? 3.5 : 2.0, isPool ? 3.5 : 4.0);
+          wNormClone.needsUpdate = true;
+          buckets.disposables.textures.add(wNormClone);
 
-        const mat = new THREE.MeshPhysicalMaterial({
+          const mat = new THREE.MeshPhysicalMaterial({
+            name,
+            color: new THREE.Color(isPool ? 0x1c6a7d : 0xcdf0fa),
+            normalMap: wNormClone,
+            normalScale: new THREE.Vector2(isPool ? 0.42 : 0.65, isPool ? 0.42 : 0.65),
+            roughness: 0.06,
+            metalness: 0.05,
+            ior: 1.333,
+            reflectivity: 0.95,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.05,
+            transparent: true,
+            opacity: isPool ? 0.78 : 0.66,
+            side: THREE.DoubleSide,
+            envMapIntensity: 1.6,
+          });
+          buckets.waterMaterials.push(mat);
+          upgradedByName.set(name, mat);
+          buckets.disposables.materials.add(mat);
+          return mat;
+        }
+        const simpleWater = new THREE.MeshStandardMaterial({
           name,
           color: new THREE.Color(isPool ? 0x1c6a7d : 0xcdf0fa),
-          normalMap: wNormClone,
-          normalScale: new THREE.Vector2(isPool ? 0.42 : 0.65, isPool ? 0.42 : 0.65),
-          roughness: 0.06,
+          roughness: 0.16,
           metalness: 0.05,
-          ior: 1.333,
-          reflectivity: 0.95,
-          clearcoat: 1.0,
-          clearcoatRoughness: 0.05,
           transparent: true,
           opacity: isPool ? 0.78 : 0.66,
           side: THREE.DoubleSide,
-          envMapIntensity: 1.6,
         });
-        buckets.waterMaterials.push(mat);
-        upgradedByName.set(name, mat);
-        buckets.disposables.materials.add(mat);
-        return mat;
+        upgradedByName.set(name, simpleWater);
+        buckets.disposables.materials.add(simpleWater);
+        return simpleWater;
       }
 
-      // 7. Upgrade campus signage / C-wing relief / Shendu carving with baked Sobel Normal Maps
+      // 7. Embedded campus atlases (Sobel normal maps gated by quality tier)
       if (stdOrig.isMeshStandardMaterial) {
-        const campusNorm = CAMPUS_NORMAL_MAP[name];
-        if (campusNorm) {
-          stdOrig.normalMap = this.loadTex(campusNorm.normalUrl, false, false);
-          stdOrig.normalScale = new THREE.Vector2(campusNorm.normalScale, campusNorm.normalScale);
-          if (stdOrig.map) {
-            stdOrig.map.anisotropy = this.maxAnisotropy;
+        if (stdOrig.map) {
+          stdOrig.map.anisotropy = this.maxAnisotropy;
+        }
+        if (this.loadNormals) {
+          const campusNorm = CAMPUS_NORMAL_MAP[name];
+          if (campusNorm) {
+            stdOrig.normalMap = this.loadTex(campusNorm.normalUrl, false, false);
+            stdOrig.normalScale = new THREE.Vector2(campusNorm.normalScale, campusNorm.normalScale);
+            stdOrig.needsUpdate = true;
           }
-          stdOrig.needsUpdate = true;
         }
 
-        // Bronze statue / steel / white aluminum metallic polish
         if (name === "Mat_BronzeStatue") {
           stdOrig.roughness = 0.34;
           stdOrig.metalness = 0.78;
@@ -624,11 +669,13 @@ export class PBRMaterialSystem {
           stdOrig.roughness = 0.22;
           stdOrig.metalness = 0.88;
           stdOrig.envMapIntensity = 1.4;
-        } else if (name === "Mat_WhiteAlu" || name === "Mat_DarkSteel" || name === "Mat_BlueSteel") {
+        } else if (
+          this.loadEnvTextures &&
+          (name === "Mat_WhiteAlu" || name === "Mat_DarkSteel" || name === "Mat_BlueSteel")
+        ) {
           injectWeatherSurfaceShader(stdOrig, this.sharedUniforms, 0.55, 0.2);
         }
 
-        // Track interior lighting & campus lamp handles
         if (name in INT_LIGHT_BUCKET_MAP) {
           buckets.interiorLights.get(INT_LIGHT_BUCKET_MAP[name])!.push(stdOrig);
         } else if (name in INT_GLOW_BUCKET_MAP) {
@@ -651,9 +698,8 @@ export class PBRMaterialSystem {
       if (!(obj as THREE.Mesh).isMesh) return;
       const mesh = obj as THREE.Mesh;
 
-      // Ensure uv2 exists for aoMap sampling on MeshStandardMaterial / MeshPhysicalMaterial
       const geo = mesh.geometry;
-      if (geo && geo.attributes.uv && !geo.attributes.uv2) {
+      if (this.loadOrm && geo && geo.attributes.uv && !geo.attributes.uv2) {
         geo.setAttribute("uv2", geo.attributes.uv);
       }
 
@@ -663,7 +709,6 @@ export class PBRMaterialSystem {
         mesh.material = upgradeOne(mesh.material);
       }
 
-      // Transparent glass & water do not cast opaque hard shadows (allows sunbeams & window light through!)
       const firstMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
       const matName = firstMat?.name ?? "";
       const isTranslucent =
