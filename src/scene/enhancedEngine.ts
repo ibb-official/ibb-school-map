@@ -187,8 +187,12 @@ export async function mountEnhancedEngine(
 
   const horizonGeo = new THREE.CircleGeometry(480, 48);
   horizonGeo.rotateX(-Math.PI / 2);
+  const horizonDayBase = new THREE.Color(0xcfdbe6);
   const horizonMat = new THREE.MeshStandardMaterial({
-    color: initSample.hemiGroundColor.clone().lerp(initSample.fogColor, 0.52),
+    color: horizonDayBase
+      .clone()
+      .lerp(initSample.hemiGroundColor, initSample.nightFactor * 0.85)
+      .lerp(initSample.fogColor, 0.62),
     roughness: 0.94,
     metalness: 0.0,
   });
@@ -310,6 +314,7 @@ export async function mountEnhancedEngine(
         loadedRoot,
         skySystem.domeMesh,
         sample,
+        WEATHER_DARKEN_MAP[atmosphere.weather],
         (status) => {
           if (!disposed && seq === ptRequestSeq) {
             onPathTracerStatusChange?.(status);
@@ -534,9 +539,12 @@ export async function mountEnhancedEngine(
     if (!isPT && scene.background instanceof THREE.Color) {
       scene.background.copy(sample.fogColor);
     }
+    horizonDayBase
+      .setHex(0xcfdbe6)
+      .lerp(sample.hemiGroundColor, sample.nightFactor * 0.85);
     horizonMat.color
-      .copy(sample.hemiGroundColor)
-      .lerp(sample.fogColor, 0.52)
+      .copy(horizonDayBase)
+      .lerp(sample.fogColor, 0.62)
       .lerp(snowTint, sample.snowCoverage * 0.82);
     horizonMat.roughness = THREE.MathUtils.lerp(0.95, 0.24, sample.wetness * 0.65);
 
@@ -566,7 +574,7 @@ export async function mountEnhancedEngine(
 
     if (isPT && pathTracer) {
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = sample.exposure * 0.92;
+      renderer.toneMappingExposure = sample.exposure * 0.96;
       const samples = pathTracer.renderFrame();
       if (samples !== lastPtSamplesReported) {
         lastPtSamplesReported = samples;
@@ -578,11 +586,12 @@ export async function mountEnhancedEngine(
       }
     } else if (postPipeline) {
       renderer.toneMapping = THREE.NoToneMapping;
+      renderer.toneMappingExposure = sample.exposure;
       postPipeline.updateFrame(sample.wetness, sample.nightFactor, sample.twilightGlow);
       postPipeline.render(dt);
     } else {
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = sample.exposure * 0.96;
+      renderer.toneMappingExposure = sample.exposure * 0.98;
       renderer.render(scene, camera);
     }
 
@@ -643,7 +652,7 @@ export async function mountEnhancedEngine(
       ) {
         const sample = computeSolarAtmosphere(next.timeHours, next.weather);
         lightingWeather.update(sample, next.timeHours, next.weather, buckets, 0.016, 0, true);
-        pathTracer.syncEnvironmentAndLights(scene, sample);
+        pathTracer.syncEnvironmentAndLights(scene, sample, WEATHER_DARKEN_MAP[next.weather]);
       }
     },
     exportPhoto: () => {

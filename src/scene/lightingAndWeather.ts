@@ -342,7 +342,7 @@ export class LightingAndWeatherSystem {
     this.sunLight.target.position.copy(this.campusCenter);
     this.sunLight.target.updateMatrixWorld();
     this.sunLight.color.copy(sample.keyLightColor);
-    this.sunLight.intensity = sample.keyLightIntensity * (pathTracingActive ? 1.15 : 1.0);
+    this.sunLight.intensity = sample.keyLightIntensity;
 
     this.hemiLight.color.copy(sample.hemiSkyColor);
     this.hemiLight.groundColor.copy(sample.hemiGroundColor);

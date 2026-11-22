@@ -198,18 +198,18 @@ export function AtmosphereDock({
           </ToggleButton>
         </div>
 
-        {state.pathTracingActive && (
+        {(state.pathTracingActive || pathTracerStatus.phase === "error") && (
           <div className="atmo-s2-pt-box">
-            {pathTracerStatus.phase === "building" ? (
-              <ProgressBar
-                size="S"
-                isIndeterminate
-                label={pathTracerStatus.message ?? "正在构建 BVH 加速结构..."}
-              />
-            ) : pathTracerStatus.phase === "error" ? (
+            {pathTracerStatus.phase === "error" ? (
               <div className="atmo-s2-pt-error">
                 {pathTracerStatus.message ?? "当前 GPU 暂不支持路径追踪"}
               </div>
+            ) : pathTracerStatus.phase === "building" || pathTracerStatus.phase === "idle" ? (
+              <ProgressBar
+                size="S"
+                isIndeterminate
+                label={pathTracerStatus.message ?? "正在初始化光线追踪 BVH 加速结构..."}
+              />
             ) : (
               <>
                 <ProgressBar
