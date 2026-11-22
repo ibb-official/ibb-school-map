@@ -20,35 +20,54 @@ const { NodeIO, PropertyType } = require(path.join(TOOLS_NM, "@gltf-transform/co
 const { KHRMeshQuantization } = require(path.join(TOOLS_NM, "@gltf-transform/extensions"));
 const { dedup, prune, quantize, weld } = require(path.join(TOOLS_NM, "@gltf-transform/functions"));
 
-async function optimizeOne(filePath) {
+async function optimizeOne(filePath, preservePositions = false) {
   if (!fs.existsSync(filePath)) return;
   const before = fs.statSync(filePath).size;
   const io = new NodeIO().registerExtensions([KHRMeshQuantization]);
   const doc = await io.read(filePath);
-  await doc.transform(
+  const steps = [
     // Deduplicate accessors/textures/meshes ONLY — never merge distinct named materials (e.g. IntLight buckets)
     dedup({ propertyTypes: [PropertyType.ACCESSOR, PropertyType.MESH, PropertyType.TEXTURE] }),
     weld({ tolerance: 1e-4 }),
     prune({ keepAttributes: true, keepLeaves: true }),
-    quantize({
-      quantizePosition: 14,
-      quantizeNormal: 10,
-      quantizeTexcoord: 12,
-      quantizeColor: 8,
-    })
-  );
+  ];
+  if (preservePositions) {
+    // Classic mode: keep POSITION as lossless FLOAT32 (zero 14-bit quantization snapping!)
+    // while packing NORMAL/TEXCOORD_0/COLOR_0 compactly under KHR_mesh_quantization.
+    doc.createExtension(KHRMeshQuantization).setRequired(true);
+    steps.push(
+      quantize({
+        pattern: /^(NORMAL|TEXCOORD_0|COLOR_0)$/,
+        quantizeNormal: 8,
+        quantizeTexcoord: 12,
+        quantizeColor: 8,
+      })
+    );
+  } else {
+    steps.push(
+      quantize({
+        quantizePosition: 14,
+        quantizeNormal: 10,
+        quantizeTexcoord: 12,
+        quantizeColor: 8,
+      })
+    );
+  }
+  await doc.transform(...steps);
   await io.write(filePath, doc);
   const after = fs.statSync(filePath).size;
   const pct = ((1 - after / before) * 100).toFixed(1);
   console.log(
-    `[optimize_glb] ${path.basename(filePath)}: ${(before / 1024).toFixed(1)} KB -> ${(after / 1024).toFixed(1)} KB (-${pct}%)`
+    `[optimize_glb${preservePositions ? ":float32-pos" : ""}] ${path.basename(filePath)}: ${(before / 1024).toFixed(1)} KB -> ${(after / 1024).toFixed(1)} KB (-${pct}%)`
   );
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  for (const fp of args) {
-    await optimizeOne(fp);
+  const rawArgs = process.argv.slice(2);
+  const preservePositions = rawArgs.includes("--preserve-positions");
+  const files = rawArgs.filter((a) => !a.startsWith("--"));
+  for (const fp of files) {
+    await optimizeOne(fp, preservePositions);
   }
 }
 

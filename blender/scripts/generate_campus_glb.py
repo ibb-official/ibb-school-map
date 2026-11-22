@@ -21,6 +21,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -4197,12 +4198,6 @@ def main() -> None:
             optimized_targets.append(str(west_out))
             built_filenames.append("west-campus.glb")
             print(f"west-campus.glb raw: {wv} verts, {wt} tris, {west_out.stat().st_size:,} bytes, {len(west_lights)} lights")
-        if build_classic:
-            west_classic_out = out_dir / "west-campus-classic.glb"
-            wcv, wct, _ = build_west_campus(str(data_dir / "west_metric.json"), tex_dir, str(west_classic_out), classic=True)
-            optimized_targets.append(str(west_classic_out))
-            built_filenames.append("west-campus-classic.glb")
-            print(f"west-campus-classic.glb raw: {wcv} verts, {wct} tris, {west_classic_out.stat().st_size:,} bytes")
 
     if args.campus in ("east", "all"):
         if build_enhanced:
@@ -4211,12 +4206,6 @@ def main() -> None:
             optimized_targets.append(str(east_out))
             built_filenames.append("east-campus.glb")
             print(f"east-campus.glb raw: {ev} verts, {et} tris, {east_out.stat().st_size:,} bytes, {len(east_lights)} lights")
-        if build_classic:
-            east_classic_out = out_dir / "east-campus-classic.glb"
-            ecv, ect, _ = build_east_campus(str(data_dir / "east_metric.json"), tex_dir, str(east_classic_out), classic=True)
-            optimized_targets.append(str(east_classic_out))
-            built_filenames.append("east-campus-classic.glb")
-            print(f"east-campus-classic.glb raw: {ecv} verts, {ect} tris, {east_classic_out.stat().st_size:,} bytes")
 
     # Run gltf-transform weld + dedup + prune if node & scratch tools are available
     node_bin = shutil.which("node")
@@ -4230,6 +4219,12 @@ def main() -> None:
     for fname in built_filenames:
         ver = sync_campuses_model_version(repo, fname)
         print(f"{fname} final (v={ver}): {(out_dir / fname).stat().st_size:,} bytes")
+
+    # Classic mode models are built via generate_classic_glb.py (zero coplanar overlaps + lossless FLOAT32 positions)
+    if build_classic:
+        classic_script = Path(__file__).resolve().parent / "generate_classic_glb.py"
+        if classic_script.exists():
+            subprocess.run([sys.executable, str(classic_script), "--campus", args.campus], check=True)
 
     if west_lights is not None and east_lights is not None:
         write_campus_lights_ts(repo, west_lights, east_lights)

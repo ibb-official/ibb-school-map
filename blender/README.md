@@ -16,8 +16,9 @@ blender/
     ├── render_foliage_and_atlases.swift   # (macOS CoreGraphics) 绘制 6 类植物枝叶卡图集与邻楼视差室内图集
     ├── bake_campus_atlases.mjs            # 为招牌/浮雕/枝叶卡批量烘焙 Sobel 切线空间法线贴图（WebP）
     ├── archviz_geometry.py                # 写实建模模块：米制平铺 UV、浅层 3D 室内教室、植物群落、雕塑/太湖石、夜景灯具
-    ├── generate_campus_glb.py             # 纯 Python glTF 2.0 (.glb) 东西两校区生成器 + 自动产出 src/data/campusLights.ts
-    ├── optimize_glb.mjs                   # @gltf-transform 网格焊点、去重与 KHR_mesh_quantization 压缩（不合并独立灯光材质桶）
+    ├── generate_campus_glb.py             # 纯 Python glTF 2.0 (.glb) 增强模式（PBR）东西两校区生成器 + 自动产出 src/data/campusLights.ts
+    ├── generate_classic_glb.py            # 纯 Python glTF 2.0 (.glb) 普通/经典模式东西两校区生成器（无损 FLOAT32 顶点 + 零共面重叠）
+    ├── optimize_glb.mjs                   # @gltf-transform 网格焊点、去重与 KHR_mesh_quantization 压缩（`--preserve-positions` 保留 FLOAT32 顶点防 Z-fighting）
     └── build_in_blender.py                # Blender 4.x (`bpy`) 原生装配与 glTF 导出脚本
 ```
 
