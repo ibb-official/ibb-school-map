@@ -32,7 +32,7 @@ export const CAMERA_TOURS: CameraTourStop[] = [
     id: "tour-w-stage",
     campusId: "west",
     title: "主席台 · 水池",
-    subtitle: "张拉膜主席台、靠东假山叠水池、左2右3乒乓球台与食堂北侧小门",
+    subtitle: "张拉膜主席台、台下双层落地音响、靠东假山叠水池与南北向平行乒乓球台及食堂北侧小门",
     cameraPos: [-23.5, 6.8, -106.5],
     cameraTarget: [-19.5, 2.4, -131.5],
   },
