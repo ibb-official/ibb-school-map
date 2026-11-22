@@ -104,7 +104,7 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 export function computeSolarAtmosphere(
   timeHours: number,
   weather: WeatherMode,
-  dayOfYear = 145 // Pleasant late-spring/early-autumn solar arc (~14h daylight, ~68° noon peak)
+  dayOfYear = 95 // Balanced Beijing spring solar arc (~12.7h daylight, ~55° noon peak for crisp oblique facade shading & matching all 6 time presets)
 ): SolarAtmosphereSample {
   const h = ((timeHours % 24) + 24) % 24;
 
@@ -165,32 +165,33 @@ export function computeSolarAtmosphere(
     : new THREE.Vector3(sunDir.x, Math.max(sunDir.y, 0.08), sunDir.z).normalize();
 
   // Base clear-sky sunlight color & intensity curve
-  const dayColor = new THREE.Color(0xfffaf0);
-  const goldenColor = new THREE.Color(0xff9248);
+  const dayColor = new THREE.Color(0xfff7ea);
+  const goldenColor = new THREE.Color(0xff944a);
   const crimsonHorizon = new THREE.Color(0xff6b38);
-  const moonColor = new THREE.Color(0x88aee6);
+  const moonColor = new THREE.Color(0x8bb2ec);
 
   const sunColor = dayColor.clone();
   sunColor.lerp(goldenColor, twilightGlow * 0.85);
   sunColor.lerp(crimsonHorizon, smoothstep(5.0, -2.5, sunElevationDeg) * (1 - nightFactor) * 0.65);
 
+  // Strong directional sun vs disciplined ambient sky fill creates crisp architectural light/shadow contrast
   const sunBaseIntensity =
-    smoothstep(-2.0, 14.0, sunElevationDeg) * 3.1 +
-    twilightGlow * 0.95;
+    smoothstep(-2.0, 12.0, sunElevationDeg) * 3.85 +
+    twilightGlow * 0.9;
 
   const keyLightColor = isNight ? moonColor.clone() : sunColor.clone();
   let keyLightIntensity = isNight
-    ? 0.42 * (0.45 + 0.55 * nightFactor)
-    : Math.max(0.2, sunBaseIntensity);
+    ? 0.44 * (0.45 + 0.55 * nightFactor)
+    : Math.max(0.24, sunBaseIntensity);
 
   // Hemisphere ambient colors across day -> sunset/sunrise -> blue hour -> deep night
-  const hemiDaySky = new THREE.Color(0x9ecaff);
+  const hemiDaySky = new THREE.Color(0x98ccff);
   const hemiSunsetSky = new THREE.Color(0xf7a47e);
-  const hemiNightSky = new THREE.Color(0x162646);
+  const hemiNightSky = new THREE.Color(0x182a4e);
 
-  const hemiDayGnd = new THREE.Color(0x7c756c);
-  const hemiSunsetGnd = new THREE.Color(0x523f42);
-  const hemiNightGnd = new THREE.Color(0x0c111c);
+  const hemiDayGnd = new THREE.Color(0x96918a);
+  const hemiSunsetGnd = new THREE.Color(0x5c484b);
+  const hemiNightGnd = new THREE.Color(0x0d1320);
 
   const hemiSkyColor = hemiDaySky
     .clone()
@@ -201,12 +202,13 @@ export function computeSolarAtmosphere(
     .lerp(hemiSunsetGnd, twilightGlow * 0.65)
     .lerp(hemiNightGnd, nightFactor);
 
-  let hemiIntensity = THREE.MathUtils.lerp(0.88, 0.24, nightFactor) + twilightGlow * 0.14;
-  let envIntensity = THREE.MathUtils.lerp(1.05, 0.22, nightFactor);
+  // Keep sky fill disciplined so sunlit facades & crisp cast shadows pop instead of washing into overcast grey
+  let hemiIntensity = THREE.MathUtils.lerp(0.48, 0.2, nightFactor) + twilightGlow * 0.12;
+  let envIntensity = THREE.MathUtils.lerp(0.64, 0.2, nightFactor);
 
   // Atmospheric fog color & density
-  const fogDay = new THREE.Color(0xcde0f5);
-  const fogTwilight = new THREE.Color(0xe69f78);
+  const fogDay = new THREE.Color(0xd2e5f8);
+  const fogTwilight = new THREE.Color(0xe8a47c);
   const fogBlueHour = new THREE.Color(0x233354);
   const fogDeepNight = new THREE.Color(0x0a1120);
 
@@ -231,55 +233,55 @@ export function computeSolarAtmosphere(
   let wetness = 0.0;
   let snowCoverage = 0.0;
   let windStrength = 0.35;
-  let exposure = THREE.MathUtils.lerp(1.06, 1.24, nightFactor) + twilightGlow * 0.06;
+  let exposure = THREE.MathUtils.lerp(1.08, 1.24, nightFactor) + twilightGlow * 0.05;
 
   // Apply physical multi-weather coupling
   if (weather === "cloudy") {
     cloudCoverage = 0.78;
-    keyLightIntensity *= isNight ? 0.65 : 0.42;
-    hemiIntensity *= 1.18;
-    envIntensity *= 0.88;
+    keyLightIntensity *= isNight ? 0.65 : 0.48;
+    hemiIntensity *= 1.32;
+    envIntensity *= 0.92;
     turbidity += 4.0;
     fogDensity = 0.00055;
-    fogColor.lerp(new THREE.Color(isNight ? 0x141b29 : 0xbbc6d4), 0.52);
-    cloudTint.lerp(new THREE.Color(isNight ? 0x1a2232 : 0xd0d8e2), 0.48);
+    fogColor.lerp(new THREE.Color(isNight ? 0x141b29 : 0xc2cddb), 0.5);
+    cloudTint.lerp(new THREE.Color(isNight ? 0x1a2232 : 0xd6dee8), 0.45);
     windStrength = 0.62;
   } else if (weather === "rainy") {
     cloudCoverage = 0.92;
     wetness = 1.0;
-    keyLightIntensity *= isNight ? 0.55 : 0.28;
-    hemiIntensity *= 1.05;
-    envIntensity *= 0.95; // keep reflections crisp on wet asphalt & puddles
+    keyLightIntensity *= isNight ? 0.55 : 0.34;
+    hemiIntensity *= 1.24;
+    envIntensity *= 1.08; // keep reflections crisp on wet asphalt & puddles
     turbidity += 6.0;
-    fogDensity = 0.0016 + nightFactor * 0.0005;
-    fogColor.lerp(new THREE.Color(isNight ? 0x0d1524 : 0x7e8f9f), 0.72);
-    cloudTint.lerp(new THREE.Color(isNight ? 0x141c2a : 0x8d9aa8), 0.68);
+    fogDensity = 0.0014 + nightFactor * 0.0005;
+    fogColor.lerp(new THREE.Color(isNight ? 0x0d1524 : 0x8e9fb0), 0.68);
+    cloudTint.lerp(new THREE.Color(isNight ? 0x141c2a : 0x9aa7b5), 0.65);
     windStrength = 1.15;
-    exposure += 0.04;
+    exposure += 0.08;
   } else if (weather === "misty") {
     cloudCoverage = 0.55;
     wetness = 0.24;
-    keyLightIntensity *= isNight ? 0.6 : 0.68;
-    hemiIntensity *= 1.16;
+    keyLightIntensity *= isNight ? 0.6 : 0.72;
+    hemiIntensity *= 1.24;
     turbidity += 5.5;
     mieCoefficient += 0.025;
-    fogDensity = 0.0032;
+    fogDensity = 0.0028;
     fogColor.lerp(
-      new THREE.Color(isNight ? 0x182236 : twilightGlow > 0.25 ? 0xe8b594 : 0xd5dfe8),
-      0.66
+      new THREE.Color(isNight ? 0x182236 : twilightGlow > 0.25 ? 0xe8b594 : 0xd9e3ec),
+      0.64
     );
     windStrength = 0.22;
   } else if (weather === "snowy") {
     cloudCoverage = 0.86;
     snowCoverage = 1.0;
     wetness = 0.14;
-    keyLightIntensity *= isNight ? 0.82 : 0.52;
-    hemiIntensity *= 1.32; // snow ground bounce makes winter scenes softly luminous
-    hemiGroundColor.lerp(new THREE.Color(isNight ? 0x26344a : 0xdce6f2), 0.62);
-    envIntensity *= 1.05;
-    fogDensity = 0.0018;
-    fogColor.lerp(new THREE.Color(isNight ? 0x162134 : 0xd8e2ee), 0.68);
-    cloudTint.lerp(new THREE.Color(isNight ? 0x222f46 : 0xe4ecf4), 0.65);
+    keyLightIntensity *= isNight ? 0.82 : 0.58;
+    hemiIntensity *= 1.48; // snow ground bounce makes winter scenes softly luminous
+    hemiGroundColor.lerp(new THREE.Color(isNight ? 0x26344a : 0xe2ebf5), 0.65);
+    envIntensity *= 1.1;
+    fogDensity = 0.0016;
+    fogColor.lerp(new THREE.Color(isNight ? 0x162134 : 0xdce6f2), 0.66);
+    cloudTint.lerp(new THREE.Color(isNight ? 0x222f46 : 0xe8f0f7), 0.62);
     windStrength = 0.78;
   }
 

@@ -103,11 +103,13 @@ const CAMPUS_RT_FRAG = /* glsl */ `
     if (uSsgiStrength > 0.001) {
       vec3 giAccum = vec3(0.0);
       float wSum = 0.0;
-      float radius = 0.028;
+      float radius = 0.044;
       const float GOLDEN = 2.39996323;
       for (int k = 0; k < 12; k++) {
+        if (k >= 8 && uSsgiStrength < 0.7) break;
         float fk = float(k) + 0.5;
-        float r = radius * sqrt(fk / 12.0);
+        float tapCount = uSsgiStrength < 0.7 ? 8.0 : 12.0;
+        float r = radius * sqrt(fk / tapCount);
         float ang = fk * GOLDEN;
         vec2 tapUv = clamp(uv + vec2(cos(ang), sin(ang)) * r, vec2(0.01), vec2(0.99));
         float tapDepth = readDepth(tapUv);
@@ -115,20 +117,20 @@ const CAMPUS_RT_FRAG = /* glsl */ `
         vec3 tapPos = reconstructViewPos(tapUv, tapDepth);
         vec3 delta = tapPos - viewPos;
         float dist = length(delta);
-        if (dist < 0.15 || dist > 9.0) continue;
+        if (dist < 0.25 || dist > 18.0) continue;
         vec3 dirToTap = delta / dist;
         float ndl = max(dot(viewNormal, dirToTap), 0.0);
-        if (ndl > 0.1) {
-          vec3 tapCol = min(texture2D(inputBuffer, tapUv).rgb, vec3(2.5));
-          float atten = 1.0 / (1.0 + dist * dist * 0.28);
+        if (ndl > 0.08) {
+          vec3 tapCol = min(texture2D(inputBuffer, tapUv).rgb, vec3(2.8));
+          float atten = 1.0 / (1.0 + dist * dist * 0.085);
           float w = ndl * atten;
           giAccum += tapCol * w;
           wSum += w;
         }
       }
       if (wSum > 0.001) {
-        vec3 indirect = (giAccum / max(wSum, 1.8)) * (0.14 + 0.10 * uNightFactor) * uSsgiStrength;
-        col += indirect * clamp(inputColor.rgb + vec3(0.12), vec3(0.0), vec3(0.85));
+        vec3 indirect = (giAccum / max(wSum, 1.4)) * (0.24 + 0.14 * uNightFactor) * uSsgiStrength;
+        col += indirect * clamp(inputColor.rgb + vec3(0.14), vec3(0.0), vec3(0.9));
       }
     }
 
@@ -250,7 +252,9 @@ export class PostProcessingPipeline {
     const renderPass = new RenderPass(scene, camera);
     this.composer.addPass(renderPass);
 
-    this.normalPass = new NormalPass(scene, camera);
+    this.normalPass = new NormalPass(scene, camera, {
+      resolutionScale: quality === "ultra" ? 0.75 : 0.5,
+    });
     this.composer.addPass(this.normalPass);
 
     const drawingSize = renderer.getDrawingBufferSize(new THREE.Vector2());
@@ -260,9 +264,10 @@ export class PostProcessingPipeline {
       Math.max(1, drawingSize.x),
       Math.max(1, drawingSize.y)
     );
-    this.n8aoPass.configuration.aoRadius = 0.95;
+    this.n8aoPass.configuration.aoRadius = 1.65;
     this.n8aoPass.configuration.distanceFalloff = 1.0;
-    this.n8aoPass.configuration.intensity = 1.35;
+    this.n8aoPass.configuration.intensity = 0.85;
+    this.n8aoPass.configuration.color = new THREE.Color(0x182538);
     this.n8aoPass.configuration.halfRes = false;
     this.n8aoPass.configuration.gammaCorrection = false;
     this.composer.addPass(this.n8aoPass);
@@ -291,7 +296,7 @@ export class PostProcessingPipeline {
     });
 
     const toneMappingEffect = new ToneMappingEffect({
-      mode: ToneMappingMode.AGX,
+      mode: ToneMappingMode.ACES_FILMIC,
     });
 
     const mainEffectPass = new EffectPass(
@@ -316,18 +321,21 @@ export class PostProcessingPipeline {
     this.composer.multisampling = this.maxMsaaSamples;
     this.n8aoPass.configuration.halfRes = false;
     this.n8aoPass.configuration.denoiseRadius = 4;
-    this.n8aoPass.configuration.aoRadius = 0.95;
+    this.n8aoPass.configuration.aoRadius = 1.65;
+    this.n8aoPass.configuration.color = new THREE.Color(0x182538);
 
     if (quality === "ultra") {
       this.n8aoPass.setQualityMode("Ultra");
-      this.n8aoPass.configuration.intensity = 1.5;
-      this.sharpenEffect.setSharpness(0.42);
+      this.n8aoPass.configuration.intensity = 1.05;
+      this.sharpenEffect.setSharpness(0.36);
+      this.normalPass.resolution.scale = 0.75;
       this.normalPass.enabled = true;
     } else {
       this.n8aoPass.setQualityMode("Medium");
-      this.n8aoPass.configuration.intensity = 1.35;
-      this.sharpenEffect.setSharpness(0.22);
-      this.normalPass.enabled = false;
+      this.n8aoPass.configuration.intensity = 0.85;
+      this.sharpenEffect.setSharpness(0.2);
+      this.normalPass.resolution.scale = 0.5;
+      this.normalPass.enabled = true;
     }
   }
 
@@ -341,11 +349,11 @@ export class PostProcessingPipeline {
 
   public updateFrame(wetness: number, nightFactor: number, twilightGlow: number): void {
     const needWetSsr = wetness > 0.05;
-    const needSsgi = this.quality === "ultra";
+    const needSsgi = this.quality === "high" || this.quality === "ultra";
     this.normalPass.enabled = needWetSsr || needSsgi;
 
-    const ssrStrength = needWetSsr ? (this.quality === "ultra" ? 1.0 : 0.8) : 0.0;
-    const ssgiStrength = needSsgi ? 0.65 : 0.0;
+    const ssrStrength = needWetSsr ? (this.quality === "ultra" ? 1.0 : 0.85) : 0.0;
+    const ssgiStrength = this.quality === "ultra" ? 0.85 : this.quality === "high" ? 0.52 : 0.0;
 
     this.rtEffect.sync(this.camera, wetness, nightFactor, ssrStrength, ssgiStrength);
 

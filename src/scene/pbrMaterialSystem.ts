@@ -33,8 +33,12 @@ export interface UpgradedMaterialBuckets {
 
 interface PBRSetConfig {
   folder: string;
-  tint?: number;
+  /** Linear-space RGB albedo multiplier to calibrate dark photogrammetry maps cleanly across WebGL & PathTracer */
+  albedoGain?: [number, number, number];
+  /** Target roughness when ORM roughnessMap is NOT loaded (low/medium tiers) */
   roughness?: number;
+  /** Roughness multiplier when ORM roughnessMap IS loaded (high/ultra tiers) so orm.g is never double-multiplied */
+  ormRoughness?: number;
   metalness?: number;
   normalScale?: number;
   clearcoat?: number;
@@ -44,49 +48,190 @@ interface PBRSetConfig {
 }
 
 const PBR_MATERIAL_MAP: Record<string, PBRSetConfig> = {
-  Mat_PBR_Qingzhuan: { folder: "qingzhuan", roughness: 0.94, normalScale: 1.25, aoIntensity: 0.85, allowWeather: true },
-  Mat_PBR_RedBrick: { folder: "red_brick", roughness: 0.92, normalScale: 1.22, aoIntensity: 0.85, allowWeather: true },
-  Mat_PBR_Stucco: { folder: "stucco", roughness: 0.88, normalScale: 0.85, aoIntensity: 0.6, allowWeather: true },
-  Mat_PBR_GreyRib: { folder: "grey_rib", roughness: 0.84, normalScale: 1.35, aoIntensity: 0.75, allowWeather: true },
+  Mat_PBR_Qingzhuan: {
+    folder: "qingzhuan",
+    albedoGain: [1.78, 1.82, 1.88],
+    roughness: 0.9,
+    ormRoughness: 0.98,
+    normalScale: 1.18,
+    aoIntensity: 0.32,
+    allowWeather: true,
+  },
+  Mat_PBR_RedBrick: {
+    folder: "red_brick",
+    albedoGain: [1.72, 1.38, 1.28],
+    roughness: 0.88,
+    ormRoughness: 1.5,
+    normalScale: 1.15,
+    aoIntensity: 0.32,
+    allowWeather: true,
+  },
+  Mat_PBR_Stucco: {
+    folder: "stucco",
+    albedoGain: [1.26, 1.26, 1.25],
+    roughness: 0.86,
+    ormRoughness: 1.0,
+    normalScale: 0.78,
+    aoIntensity: 0.24,
+    allowWeather: true,
+  },
+  Mat_PBR_GreyRib: {
+    folder: "grey_rib",
+    albedoGain: [1.52, 1.54, 1.56],
+    roughness: 0.82,
+    ormRoughness: 1.05,
+    normalScale: 1.25,
+    aoIntensity: 0.28,
+    allowWeather: true,
+  },
   Mat_PBR_Marble: {
     folder: "marble",
-    roughness: 0.34,
-    normalScale: 0.68,
-    clearcoat: 0.58,
-    clearcoatRoughness: 0.16,
-    aoIntensity: 0.5,
+    albedoGain: [1.28, 1.28, 1.26],
+    roughness: 0.32,
+    ormRoughness: 1.35,
+    normalScale: 0.62,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.22,
+    aoIntensity: 0.2,
     allowWeather: true,
   },
-  Mat_PBR_PlazaTile: { folder: "plaza_tile", roughness: 0.84, normalScale: 1.15, aoIntensity: 0.78, allowWeather: true },
-  Mat_PBR_DarkSlate: { folder: "dark_slate", roughness: 0.74, normalScale: 1.2, aoIntensity: 0.8, allowWeather: true },
-  Mat_PBR_Asphalt: { folder: "asphalt", roughness: 0.92, normalScale: 1.28, aoIntensity: 0.85, allowWeather: true },
-  Mat_PBR_GreyTile: { folder: "roof_tile", tint: 0xa2aab4, roughness: 0.78, normalScale: 1.45, aoIntensity: 0.85, allowWeather: true },
-  Mat_PBR_RedTile: { folder: "roof_tile", tint: 0xd46a64, roughness: 0.72, normalScale: 1.4, aoIntensity: 0.8, allowWeather: true },
+  Mat_PBR_PlazaTile: {
+    folder: "plaza_tile",
+    albedoGain: [2.35, 2.38, 2.42],
+    roughness: 0.82,
+    ormRoughness: 1.65,
+    normalScale: 1.05,
+    aoIntensity: 0.28,
+    allowWeather: true,
+  },
+  Mat_PBR_DarkSlate: {
+    folder: "dark_slate",
+    albedoGain: [1.85, 1.9, 1.98],
+    roughness: 0.74,
+    ormRoughness: 1.38,
+    normalScale: 1.1,
+    aoIntensity: 0.28,
+    allowWeather: true,
+  },
+  Mat_PBR_Asphalt: {
+    folder: "asphalt",
+    albedoGain: [1.95, 2.0, 2.08],
+    roughness: 0.9,
+    ormRoughness: 1.22,
+    normalScale: 1.18,
+    aoIntensity: 0.3,
+    allowWeather: true,
+  },
+  Mat_PBR_GreyTile: {
+    folder: "roof_tile",
+    albedoGain: [1.38, 1.42, 1.48],
+    roughness: 0.76,
+    ormRoughness: 1.45,
+    normalScale: 1.35,
+    aoIntensity: 0.32,
+    allowWeather: true,
+  },
+  Mat_PBR_RedTile: {
+    folder: "roof_tile",
+    albedoGain: [1.88, 0.72, 0.64],
+    roughness: 0.7,
+    ormRoughness: 1.35,
+    normalScale: 1.3,
+    aoIntensity: 0.3,
+    allowWeather: true,
+  },
   Mat_PBR_BlueTile: {
     folder: "roof_tile",
-    tint: 0x3b86e8,
-    roughness: 0.38,
-    clearcoat: 0.65,
-    clearcoatRoughness: 0.18,
-    normalScale: 1.35,
-    aoIntensity: 0.75,
+    albedoGain: [0.34, 0.96, 2.22],
+    roughness: 0.44,
+    ormRoughness: 0.95,
+    clearcoat: 0.24,
+    clearcoatRoughness: 0.26,
+    normalScale: 1.2,
+    aoIntensity: 0.26,
     allowWeather: true,
   },
-  Mat_PBR_GreenRoof: { folder: "grass", tint: 0x89a87a, roughness: 0.88, normalScale: 1.0, aoIntensity: 0.7, allowWeather: true },
-  Mat_PBR_TrackEPDM: { folder: "track_epdm", roughness: 0.92, normalScale: 1.15, aoIntensity: 0.8, allowWeather: true },
-  Mat_PBR_CourtPU: { folder: "court_pu", tint: 0xd87c66, roughness: 0.52, normalScale: 0.45, aoIntensity: 0.45, allowWeather: true },
-  Mat_PBR_CourtGreen: { folder: "court_pu", tint: 0x268252, roughness: 0.50, normalScale: 0.45, aoIntensity: 0.45, allowWeather: true },
-  Mat_PBR_Grass: { folder: "grass", roughness: 0.94, normalScale: 1.1, aoIntensity: 0.85, allowWeather: true },
-  Mat_PBR_Bark: { folder: "bark", roughness: 0.95, normalScale: 1.4, aoIntensity: 0.9, allowWeather: true },
-  Mat_PBR_Wood: { folder: "wood", roughness: 0.66, normalScale: 0.85, aoIntensity: 0.55, allowWeather: false },
-  Mat_PBR_Rockery: { folder: "rockery", roughness: 0.88, normalScale: 1.35, aoIntensity: 0.9, allowWeather: true },
+  Mat_PBR_GreenRoof: {
+    folder: "grass",
+    albedoGain: [0.76, 1.38, 0.94],
+    roughness: 0.88,
+    ormRoughness: 1.18,
+    normalScale: 0.95,
+    aoIntensity: 0.26,
+    allowWeather: true,
+  },
+  Mat_PBR_TrackEPDM: {
+    folder: "track_epdm",
+    albedoGain: [1.32, 1.12, 1.05],
+    roughness: 0.88,
+    ormRoughness: 1.16,
+    normalScale: 1.05,
+    aoIntensity: 0.28,
+    allowWeather: true,
+  },
+  Mat_PBR_CourtPU: {
+    folder: "court_pu",
+    albedoGain: [0.88, 0.3, 0.2],
+    roughness: 0.56,
+    ormRoughness: 1.75,
+    normalScale: 0.42,
+    aoIntensity: 0.2,
+    allowWeather: true,
+  },
+  Mat_PBR_CourtGreen: {
+    folder: "court_pu",
+    albedoGain: [0.08, 0.46, 0.22],
+    roughness: 0.54,
+    ormRoughness: 1.7,
+    normalScale: 0.42,
+    aoIntensity: 0.2,
+    allowWeather: true,
+  },
+  Mat_PBR_Grass: {
+    folder: "grass",
+    albedoGain: [0.74, 1.48, 0.88],
+    roughness: 0.92,
+    ormRoughness: 1.24,
+    normalScale: 1.0,
+    aoIntensity: 0.26,
+    allowWeather: true,
+  },
+  Mat_PBR_Bark: {
+    folder: "bark",
+    albedoGain: [1.45, 1.4, 1.32],
+    roughness: 0.94,
+    ormRoughness: 1.0,
+    normalScale: 1.3,
+    aoIntensity: 0.32,
+    allowWeather: true,
+  },
+  Mat_PBR_Wood: {
+    folder: "wood",
+    albedoGain: [2.35, 2.15, 1.85],
+    roughness: 0.64,
+    ormRoughness: 2.2,
+    normalScale: 0.8,
+    aoIntensity: 0.22,
+    allowWeather: false,
+  },
+  Mat_PBR_Rockery: {
+    folder: "rockery",
+    albedoGain: [1.22, 1.22, 1.2],
+    roughness: 0.86,
+    ormRoughness: 1.35,
+    normalScale: 1.28,
+    aoIntensity: 0.34,
+    allowWeather: true,
+  },
   Mat_PBR_BurgundyMetal: {
     folder: "grey_rib",
-    tint: 0x7e2a28,
-    roughness: 0.42,
-    metalness: 0.42,
-    clearcoat: 0.25,
-    normalScale: 0.6,
+    albedoGain: [0.56, 0.14, 0.13],
+    roughness: 0.44,
+    ormRoughness: 0.62,
+    metalness: 0.36,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.24,
+    normalScale: 0.55,
     allowWeather: true,
   },
 };
@@ -187,8 +332,9 @@ function injectWeatherSurfaceShader(
           float wetPorosity = mix(0.68, 0.52, upMask);
           diffuseColor.rgb *= mix(1.0, wetPorosity + 0.14 * cNoise.g, uWetness);
         }
-        float baseAO = smoothstep(0.0, 1.6, vCampusWorldPos.y);
-        diffuseColor.rgb *= mix(0.88 + 0.08 * cNoise.b, 1.0, baseAO);
+        float baseAO = smoothstep(0.0, 1.4, vCampusWorldPos.y);
+        diffuseColor.rgb *= mix(0.94 + 0.04 * cNoise.b, 1.0, baseAO);
+        diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.94));
         if (uSnow > 0.01 && uSnowWeight > 0.01) {
           float snowMask = smoothstep(0.42, 0.78, vCampusWorldNorm.y + (cNoise.r - 0.5) * 0.25) * uSnow * uSnowWeight;
           vec3 snowAlbedo = vec3(0.92, 0.95, 0.99);
@@ -200,6 +346,7 @@ function injectWeatherSurfaceShader(
         "#include <roughnessmap_fragment>",
         /* glsl */ `
         #include <roughnessmap_fragment>
+        roughnessFactor = clamp(roughnessFactor, 0.06, 0.98);
         if (uWetness > 0.01) {
           vec3 wNoise = texture2D(uPuddleNoise, vCampusWorldPos.xz * 0.035).rgb;
           float upFace = smoothstep(0.62, 0.92, vCampusWorldNorm.y);
@@ -404,7 +551,6 @@ export class PBRMaterialSystem {
     tex.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
     tex.anisotropy = this.maxAnisotropy;
     tex.flipY = false;
-    tex.needsUpdate = true;
     this.textureCache.set(key, tex);
     return tex;
   }
@@ -450,11 +596,17 @@ export class PBRMaterialSystem {
         const orm = this.loadOrm ? this.loadTex(`${baseUrl}/orm.webp`, false, true) : null;
 
         const usePhysical = this.usePhysicalShaders && pbrSpec.clearcoat !== undefined;
+        const baseColor = new THREE.Color(0xffffff);
+        if (pbrSpec.albedoGain) {
+          baseColor.setRGB(pbrSpec.albedoGain[0], pbrSpec.albedoGain[1], pbrSpec.albedoGain[2]);
+        }
+
         const commonParams: THREE.MeshStandardMaterialParameters = {
           name,
-          color: new THREE.Color(pbrSpec.tint ?? 0xffffff),
+          color: baseColor,
           map: albedo,
-          roughness: pbrSpec.roughness ?? 0.9,
+          // When orm.g carries baked roughness, avoid double-multiplying by scalar roughness
+          roughness: orm ? (pbrSpec.ormRoughness ?? 1.0) : (pbrSpec.roughness ?? 0.9),
           metalness: pbrSpec.metalness ?? 0.0,
           vertexColors: Boolean(stdOrig.vertexColors),
         };
@@ -467,9 +619,11 @@ export class PBRMaterialSystem {
         }
         if (orm) {
           commonParams.aoMap = orm;
-          commonParams.aoMapIntensity = pbrSpec.aoIntensity ?? 0.75;
+          commonParams.aoMapIntensity = pbrSpec.aoIntensity ?? 0.28;
           commonParams.roughnessMap = orm;
-          commonParams.metalnessMap = orm;
+          if ((pbrSpec.metalness ?? 0) > 0) {
+            commonParams.metalnessMap = orm;
+          }
         }
 
         const mat = usePhysical
@@ -605,17 +759,19 @@ export class PBRMaterialSystem {
       if (name === "Mat_RockeryWater" || name === "Mat_WaterfallStream") {
         const isPool = name === "Mat_RockeryWater";
         if (waterNormal && this.usePhysicalShaders) {
-          const wNormClone = waterNormal.clone();
-          wNormClone.wrapS = THREE.RepeatWrapping;
-          wNormClone.wrapT = THREE.RepeatWrapping;
-          wNormClone.repeat.set(isPool ? 3.5 : 2.0, isPool ? 3.5 : 4.0);
-          wNormClone.needsUpdate = true;
-          buckets.disposables.textures.add(wNormClone);
+          const wNormTex = this.loader.load("/textures/env/water_normal.webp");
+          wNormTex.colorSpace = THREE.NoColorSpace;
+          wNormTex.wrapS = THREE.RepeatWrapping;
+          wNormTex.wrapT = THREE.RepeatWrapping;
+          wNormTex.anisotropy = this.maxAnisotropy;
+          wNormTex.flipY = false;
+          wNormTex.repeat.set(isPool ? 3.5 : 2.0, isPool ? 3.5 : 4.0);
+          buckets.disposables.textures.add(wNormTex);
 
           const mat = new THREE.MeshPhysicalMaterial({
             name,
             color: new THREE.Color(isPool ? 0x1c6a7d : 0xcdf0fa),
-            normalMap: wNormClone,
+            normalMap: wNormTex,
             normalScale: new THREE.Vector2(isPool ? 0.42 : 0.65, isPool ? 0.42 : 0.65),
             roughness: 0.06,
             metalness: 0.05,
@@ -697,11 +853,6 @@ export class PBRMaterialSystem {
     root.traverse((obj) => {
       if (!(obj as THREE.Mesh).isMesh) return;
       const mesh = obj as THREE.Mesh;
-
-      const geo = mesh.geometry;
-      if (this.loadOrm && geo && geo.attributes.uv && !geo.attributes.uv2) {
-        geo.setAttribute("uv2", geo.attributes.uv);
-      }
 
       if (Array.isArray(mesh.material)) {
         mesh.material = mesh.material.map(upgradeOne);

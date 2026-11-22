@@ -64,18 +64,18 @@ const SKY_DOME_FRAG = /* glsl */ `
     float elev = clamp(dir.y, -0.2, 1.0);
     float up = max(dir.y, 0.0);
 
-    // 1. Atmospheric Zenith -> Mid -> Horizon gradient across day, golden hour, blue hour & night
-    vec3 dayZenith = vec3(0.11, 0.34, 0.72);
-    vec3 dayMid = vec3(0.36, 0.62, 0.90);
-    vec3 dayHorizon = vec3(0.76, 0.87, 0.96);
+    // 1. Physically linear Zenith -> Mid -> Horizon gradient across day, golden hour, blue hour & night
+    vec3 dayZenith = vec3(0.038, 0.165, 0.54);
+    vec3 dayMid = vec3(0.16, 0.40, 0.78);
+    vec3 dayHorizon = vec3(0.54, 0.71, 0.88);
 
-    vec3 twZenith = vec3(0.13, 0.19, 0.42);
-    vec3 twMid = vec3(0.56, 0.33, 0.44);
-    vec3 twHorizon = vec3(1.15, 0.48, 0.22);
+    vec3 twZenith = vec3(0.055, 0.095, 0.28);
+    vec3 twMid = vec3(0.36, 0.17, 0.26);
+    vec3 twHorizon = vec3(1.05, 0.36, 0.12);
 
-    vec3 nightZenith = vec3(0.012, 0.022, 0.055);
-    vec3 nightMid = vec3(0.024, 0.042, 0.095);
-    vec3 nightHorizon = vec3(0.055, 0.075, 0.135);
+    vec3 nightZenith = vec3(0.008, 0.016, 0.044);
+    vec3 nightMid = vec3(0.018, 0.034, 0.082);
+    vec3 nightHorizon = vec3(0.042, 0.062, 0.118);
 
     vec3 zenithCol = mix(mix(dayZenith, twZenith, uTwilightGlow * 0.88), nightZenith, uNightFactor);
     vec3 midCol = mix(mix(dayMid, twMid, uTwilightGlow * 0.90), nightMid, uNightFactor);
@@ -156,13 +156,20 @@ const SKY_DOME_FRAG = /* glsl */ `
     // 3. Weather overcast veiling & smooth horizon ground-apron blend
     sky = mix(sky, uFogColor * (1.0 - 0.1 * uNightFactor), uWeatherDarken * 0.42 * (1.0 - up * 0.5));
     if (elev < 0.02) {
-      float below = smoothstep(0.02, -0.06, elev);
-      sky = mix(sky, uFogColor * 0.82, below);
+      float below = smoothstep(0.02, -0.08, elev);
+      sky = mix(sky, uFogColor * mix(0.97, 0.82, uNightFactor), below);
     }
 
     gl_FragColor = vec4(sky, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
+
+const SKY_ENV_FRAG = SKY_DOME_FRAG.replace(
+  "#include <tonemapping_fragment>\n    #include <colorspace_fragment>",
+  ""
+);
 
 export class AtmosphereSkySystem {
   public readonly domeMesh: THREE.Mesh;
@@ -178,13 +185,14 @@ export class AtmosphereSkySystem {
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.pmrem.compileEquirectangularShader();
 
-    const makeMat = () =>
+    const makeMat = (isEnvPass: boolean) =>
       new THREE.ShaderMaterial({
         vertexShader: SKY_DOME_VERT,
-        fragmentShader: SKY_DOME_FRAG,
+        fragmentShader: isEnvPass ? SKY_ENV_FRAG : SKY_DOME_FRAG,
         side: THREE.BackSide,
         depthWrite: false,
         fog: false,
+        toneMapped: !isEnvPass,
         uniforms: {
           uSunDir: { value: new THREE.Vector3(0.5, 0.6, 0.4) },
           uMoonDir: { value: new THREE.Vector3(-0.4, 0.6, -0.4) },
@@ -198,16 +206,16 @@ export class AtmosphereSkySystem {
         },
       });
 
-    this.domeMaterial = makeMat();
+    this.domeMaterial = makeMat(false);
     const domeGeo = new THREE.SphereGeometry(520, 48, 32);
     this.domeMesh = new THREE.Mesh(domeGeo, this.domeMaterial);
     this.domeMesh.name = "__atmosphere_sky_dome";
     this.domeMesh.frustumCulled = false;
     this.domeMesh.renderOrder = -1000;
 
-    // Dedicated lightweight scene for real-time PMREM HDR sky IBL baking
+    // Dedicated lightweight scene for real-time PMREM HDR sky IBL baking (stays strictly linear HDR)
     this.envScene = new THREE.Scene();
-    this.envDomeMaterial = makeMat();
+    this.envDomeMaterial = makeMat(true);
     const envGeo = new THREE.SphereGeometry(40, 32, 20);
     const envMesh = new THREE.Mesh(envGeo, this.envDomeMaterial);
     this.envScene.add(envMesh);
@@ -246,7 +254,7 @@ export class AtmosphereSkySystem {
     // Keep ground reflection disc matching day/night/snow luminance
     const gndObj = this.envScene.children[1] as THREE.Mesh | undefined;
     if (gndObj && gndObj.material instanceof THREE.MeshBasicMaterial) {
-      gndObj.material.color.copy(sample.hemiGroundColor).multiplyScalar(sample.isNight ? 0.35 : 0.72);
+      gndObj.material.color.copy(sample.hemiGroundColor).multiplyScalar(sample.isNight ? 0.32 : 0.55);
     }
 
     // Throttled dynamic PMREM IBL re-bake when time/weather meaningfully shifts (max ~6 Hz during scrubbing)

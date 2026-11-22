@@ -35,14 +35,14 @@ export const QUALITY_TIERS: {
     label: "高",
     shortLabel: "高",
     classicDesc: "最高 2x 高清渲染 · 2048 柔影 · 8x 各向异性过滤 · 零外部纹理",
-    enhancedDesc: "全量 PBR（漫反射/法线/ORM）· 动态加载 N8AO 环境遮蔽 + AgX + 4x MSAA",
+    enhancedDesc: "全量 PBR（漫反射/法线/ORM）· 动态加载 N8AO + SSGI + ACES Filmic + 4x MSAA",
   },
   {
     id: "ultra",
     label: "极致",
     shortLabel: "极致",
     classicDesc: "超采样高清渲染 · 4096 级全域阴影 · 满格各向异性 · 全设备解禁",
-    enhancedDesc: "全量 PBR · 4096 阴影 · 超采样 · N8AO Ultra + SSGI + CAS 锐化 + 全规格光追",
+    enhancedDesc: "全量 PBR · 4096 阴影 · 超采样 · N8AO Ultra + 全量 SSGI + CAS 锐化 + 全规格光追",
   },
 ];
 
@@ -158,14 +158,14 @@ export function estimateResourceFootprint(
   const pipelineByTier: Record<QualityTier, string> = {
     low: "增强模型 + 漫反射/树叶贴图 · 零法线/ORM/后处理",
     medium: "增强模型 + 漫反射与法线贴图 · 2048 阴影 · 无后处理 AO",
-    high: "增强模型 + 全量 PBR + 动态加载 N8AO / AgX / 4x MSAA",
-    ultra: "增强模型 + 全量 PBR + 4096 阴影 + Ultra N8AO + SSGI + CAS",
+    high: "增强模型 + 全量 PBR + 动态加载 N8AO / SSGI / ACES / 4x MSAA",
+    ultra: "增强模型 + 全量 PBR + 4096 阴影 + Ultra N8AO + 全量 SSGI + CAS",
   };
 
   const modulesByTier: Record<QualityTier, string[]> = {
     low: ["增强 3D 模型", "基础漫反射 & 树叶透贴", "24h 天光与天气系统"],
     medium: ["增强 3D 模型", "漫反射 + 法线贴图 + 室内视差", "24h 天光与天气系统"],
-    high: ["增强 3D 模型", "全量 PBR (Albedo/Normal/ORM)", "24h 天光天气 + N8AO 后处理"],
+    high: ["增强 3D 模型", "全量 PBR (Albedo/Normal/ORM)", "24h 天光天气 + N8AO & SSGI 后处理"],
     ultra: [
       "增强 3D 模型",
       "全量 PBR + 满格各向异性",
