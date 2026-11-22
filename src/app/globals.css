@@ -216,6 +216,25 @@ body {
   height: 42px;
 }
 
+.hud-settings-btn-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-settings-dirty-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hud-accent);
+  box-shadow: 0 0 0 1.5px var(--hud-bg-solid);
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Right Floating Compass & Mobile Quick Rail
    ========================================================================== */
@@ -950,6 +969,9 @@ body {
   bottom: max(22px, env(safe-area-inset-bottom));
   z-index: 24;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .vpad-joystick-base {
@@ -965,6 +987,11 @@ body {
   display: grid;
   place-items: center;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
   cursor: grab;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
@@ -1038,6 +1065,9 @@ body {
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   overflow: hidden;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .vpad-alt-btn {
@@ -1055,7 +1085,18 @@ body {
   font-weight: 700;
   cursor: pointer;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
   transition: background 110ms ease, color 110ms ease;
+}
+
+.vpad-alt-btn > * {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .vpad-alt-btn:hover {
